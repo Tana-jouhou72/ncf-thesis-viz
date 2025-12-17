@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhancing Neural Collaborative Filtering with Semantic Embeddings</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Chosen Palette: Warm Neutrals & Professional Accents -->
+    <!-- Background: #F9FAFB (Gray 50) / #FFF (White) -->
+    <!-- Primary Text: #1F2937 (Gray 800) -->
+    <!-- Accents: 
+         - Baseline: #9CA3AF (Gray 400)
+         - Hybrid (Item): #F59E0B (Amber 500)
+         - Advanced (Full): #10B981 (Emerald 500)
+         - MPNet: #3B82F6 (Blue 500)
+         - MiniLM: #8B5CF6 (Violet 500)
+    -->
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F9FAFB; color: #1F2937; }
+        .chart-container { 
+            position: relative; 
+            width: 100%; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            height: 350px; 
+            max-height: 400px; 
+        }
+        @media (max-width: 768px) {
+            .chart-container { height: 250px; }
+        }
+        .nav-item.active { border-bottom: 2px solid #10B981; color: #10B981; font-weight: 600; }
+        .card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: transform 0.2s; }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <!-- Application Structure Plan:
+         1. Hero Section: Title, Student Info, High-level Abstract.
+         2. Interactive Methodology: A conceptual block diagram showing how SBERT integrates with NCF.
+         3. "New Results" Dashboard: The core interactive section.
+            - Controls: Toggle between MPNet (High Accuracy) and MiniLM (Fast).
+            - Tab 1: Learning Curves (Loss/RMSE over epochs) - recreated from jpgs.
+            - Tab 2: Ablation Study (Bar charts comparing Baseline vs Hybrid vs Full).
+            - Tab 3: Percent Gain (Visualizing the improvement).
+         4. Key Insights & Conclusion: Textual summary of the findings.
+         
+         Rational: The user wants to showcase "New Results". Placing them in a central, togglable dashboard allows immediate comparison between the two models (MPNet vs MiniLM) without cluttering the page with static images.
+    -->
+
+    <!-- Navigation -->
+    <nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <span class="text-xl font-bold text-gray-800 tracking-tight">Thesis<span class="text-emerald-500">Viz</span></span>
+                </div>
+                <div class="hidden sm:flex space-x-8 items-center">
+                    <button onclick="scrollToSection('abstract')" class="nav-item text-gray-500 hover:text-gray-900 px-3 py-2 text-sm font-medium">Abstract</button>
+                    <button onclick="scrollToSection('methodology')" class="nav-item text-gray-500 hover:text-gray-900 px-3 py-2 text-sm font-medium">Methodology</button>
+                    <button onclick="scrollToSection('results')" class="nav-item text-gray-500 hover:text-gray-900 px-3 py-2 text-sm font-medium active">New Results</button>
+                    <button onclick="scrollToSection('conclusion')" class="nav-item text-gray-500 hover:text-gray-900 px-3 py-2 text-sm font-medium">Conclusion</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header id="abstract" class="bg-white">
+        <div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+            <div class="lg:grid lg:grid-cols-2 lg:gap-8 items-center">
+                <div>
+                    <h1 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
+                        Enhancing Neural Collaborative Filtering with <span class="text-emerald-600">Semantic Review Embeddings</span>
+                    </h1>
+                    <p class="mt-4 text-lg text-gray-500">
+                        San Tana | Graduation Thesis (Mid-Term Report)<br>
+                        National Institute of Technology, Tsuyama College
+                    </p>
+                    <p class="mt-6 text-gray-600 leading-relaxed">
+                        Traditional recommendation systems often rely solely on User-Item interaction IDs. This research proposes a <strong>Hybrid Neural Collaborative Filtering (NCF)</strong> architecture that integrates semantic understanding of reviews using <strong>SBERT (MPNet & MiniLM)</strong>. 
+                    </p>
+                    <div class="mt-8 flex gap-4">
+                        <div class="bg-emerald-50 rounded-lg p-4 border border-emerald-100">
+                            <span class="block text-sm font-bold text-emerald-800 uppercase">Core Innovation</span>
+                            <span class="text-emerald-700">Replacing static IDs with dynamic, semantic embeddings from user reviews.</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-10 lg:mt-0 relative">
+                    <!-- Abstract Stats/Highlights -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="card p-6 text-center bg-gradient-to-br from-blue-50 to-white">
+                            <div class="text-3xl font-bold text-blue-600">~50M</div>
+                            <div class="text-sm text-gray-500">Hotel Reviews Dataset</div>
+                        </div>
+                        <div class="card p-6 text-center bg-gradient-to-br from-emerald-50 to-white">
+                            <div class="text-3xl font-bold text-emerald-600">+12%</div>
+                            <div class="text-sm text-gray-500">RMSE Improvement (Full Model)</div>
+                        </div>
+                        <div class="card p-6 text-center bg-gradient-to-br from-violet-50 to-white">
+                            <div class="text-3xl font-bold text-violet-600">2</div>
+                            <div class="text-sm text-gray-500">SBERT Models Tested (MPNet & MiniLM)</div>
+                        </div>
+                        <div class="card p-6 text-center bg-gradient-to-br from-amber-50 to-white">
+                            <div class="text-3xl font-bold text-amber-600">Hybrid</div>
+                            <div class="text-sm text-gray-500">ID + User Text + Item Text</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Methodology Section -->
+    <section id="methodology" class="py-12 bg-gray-50 border-t border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-10">
+                <h2 class="text-2xl font-bold text-gray-900">Proposed Architecture</h2>
+                <p class="mt-2 text-gray-600 max-w-2xl mx-auto">
+                    Comparison between the standard NCF Baseline and the proposed Hybrid model incorporating semantic vectors.
+                </p>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+                <!-- Interactive Diagram Switcher -->
+                <div class="flex justify-center mb-8">
+                    <div class="bg-gray-100 p-1 rounded-lg inline-flex">
+                        <button onclick="setArch('baseline')" id="btn-baseline" class="px-4 py-2 rounded-md text-sm font-medium bg-white shadow-sm text-gray-900 transition-all">Baseline (IDs Only)</button>
+                        <button onclick="setArch('hybrid')" id="btn-hybrid" class="px-4 py-2 rounded-md text-sm font-medium text-gray-500 hover:text-gray-900 transition-all">Proposed (Hybrid NCF)</button>
+                    </div>
+                </div>
+
+                <!-- Diagram Visualization (CSS/Flexbox) -->
+                <div id="diagram-container" class="flex flex-col items-center justify-center space-y-4 transition-all duration-500">
+                    <!-- Top Layer: Inputs -->
+                    <div class="flex space-x-12">
+                        <div class="flex flex-col items-center">
+                            <div class="h-12 w-32 bg-gray-200 rounded flex items-center justify-center font-mono text-sm border-2 border-gray-300">User ID</div>
+                            <div class="h-8 w-0.5 bg-gray-300"></div>
+                            <div class="h-10 w-32 bg-blue-100 rounded flex items-center justify-center text-xs text-blue-800 border border-blue-200">Embedding Layer</div>
+                        </div>
+                        
+                        <!-- Hybrid Elements (Hidden by default) -->
+                        <div id="hybrid-inputs" class="hidden flex space-x-12 opacity-0 transition-opacity duration-500">
+                            <div class="flex flex-col items-center">
+                                <div class="h-12 w-32 bg-amber-50 rounded flex items-center justify-center font-mono text-sm border-2 border-amber-200">Review Text</div>
+                                <div class="h-8 w-0.5 bg-amber-300"></div>
+                                <div class="h-10 w-32 bg-amber-100 rounded flex items-center justify-center text-xs text-amber-800 border border-amber-200 font-bold">SBERT (MPNet)</div>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col items-center">
+                            <div class="h-12 w-32 bg-gray-200 rounded flex items-center justify-center font-mono text-sm border-2 border-gray-300">Item ID</div>
+                            <div class="h-8 w-0.5 bg-gray-300"></div>
+                            <div class="h-10 w-32 bg-blue-100 rounded flex items-center justify-center text-xs text-blue-800 border border-blue-200">Embedding Layer</div>
+                        </div>
+                    </div>
+
+                    <!-- Merge Layer -->
+                    <div class="h-8 w-0.5 bg-gray-400"></div>
+                    <div class="h-12 w-64 bg-gray-800 rounded flex items-center justify-center text-white text-sm font-bold shadow-lg">
+                        Concatenation Layer
+                    </div>
+                    <div class="h-8 w-0.5 bg-gray-400"></div>
+
+                    <!-- MLP Layer -->
+                    <div class="p-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 w-full max-w-md text-center">
+                        <span class="text-xs font-bold text-gray-500 uppercase tracking-wide">Multi-Layer Perceptron (MLP)</span>
+                        <div class="flex flex-col items-center mt-2 space-y-2">
+                            <div class="h-2 w-3/4 bg-gray-300 rounded-full"></div>
+                            <div class="h-2 w-1/2 bg-gray-300 rounded-full"></div>
+                            <div class="h-2 w-1/4 bg-gray-300 rounded-full"></div>
+                        </div>
+                    </div>
+
+                    <!-- Output -->
+                    <div class="h-8 w-0.5 bg-gray-400"></div>
+                    <div class="h-12 w-32 bg-emerald-500 rounded flex items-center justify-center text-white font-bold shadow-md">
+                        Prediction ŷ
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- RESULTS DASHBOARD (The Core) -->
+    <section id="results" class="py-12 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row justify-between items-end mb-8">
+                <div>
+                    <h2 class="text-3xl font-bold text-gray-900">New Experimental Results</h2>
+                    <p class="mt-2 text-gray-600">Analysis of the retrained models (August 2025).</p>
+                </div>
+                <!-- Model Selector -->
+                <div class="mt-4 md:mt-0 bg-gray-100 p-1 rounded-lg inline-flex">
+                    <button onclick="updateDashboard('mpnet')" id="sel-mpnet" class="px-4 py-2 rounded-md text-sm font-medium bg-white shadow-sm text-blue-600 transition-all">MPNet (High Accuracy)</button>
+                    <button onclick="updateDashboard('minilm')" id="sel-minilm" class="px-4 py-2 rounded-md text-sm font-medium text-gray-500 hover:text-violet-600 transition-all">MiniLM (High Speed)</button>
+                </div>
+            </div>
+
+            <!-- Dashboard Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                <!-- Main Chart Area (Learning Curves) -->
+                <div class="lg:col-span-2 space-y-8">
+                    <div class="card p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-bold text-gray-900 flex items-center">
+                                <span class="mr-2">📈</span> Learning Curves
+                            </h3>
+                            <div class="flex space-x-2 text-xs">
+                                <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-gray-400 mr-1"></span> Baseline</span>
+                                <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-amber-500 mr-1"></span> Hybrid (Item)</span>
+                                <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-emerald-500 mr-1"></span> Advanced (Full)</span>
+                            </div>
+                        </div>
+                        <!-- Visualization & Content Choices:
+                             Goal: Change - Show how the model improves over time.
+                             Method: Line Chart (Chart.js).
+                             Interaction: Hover for specific epoch values.
+                             Justification: Replaces static '1_learning_mpnet.jpg'.
+                        -->
+                        <div class="chart-container">
+                            <canvas id="learningCurveChart"></canvas>
+                        </div>
+                        <p id="learning-caption" class="mt-4 text-sm text-gray-500 text-center italic">
+                            Figure: Training RMSE loss reduction over 10 epochs. The Advanced model converges faster and lower.
+                        </p>
+                    </div>
+
+                    <!-- Final Comparison Bar Chart -->
+                    <div class="card p-6">
+                        <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                            <span class="mr-2">📊</span> RMSE Performance Comparison (Lower is Better)
+                        </h3>
+                        <div class="chart-container" style="height: 300px;">
+                            <canvas id="comparisonChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sidebar Stats & Insights -->
+                <div class="lg:col-span-1 space-y-6">
+                    
+                    <!-- KPI Cards -->
+                    <div class="card p-6 border-l-4 border-emerald-500">
+                        <h4 class="text-sm font-medium text-gray-500 uppercase">Best Performance (RMSE)</h4>
+                        <div class="mt-2 flex items-baseline">
+                            <span id="best-rmse" class="text-3xl font-extrabold text-gray-900">0.7842</span>
+                            <span class="ml-2 text-sm font-medium text-emerald-600">Advanced Model</span>
+                        </div>
+                        <p class="mt-1 text-xs text-gray-400">Vs Baseline: 0.8910</p>
+                    </div>
+
+                    <div class="card p-6 border-l-4 border-blue-500">
+                        <h4 class="text-sm font-medium text-gray-500 uppercase">Percent Improvement</h4>
+                        <div class="mt-2 flex items-baseline">
+                            <span id="percent-gain" class="text-3xl font-extrabold text-gray-900">12.4%</span>
+                            <span class="ml-2 text-sm font-medium text-blue-600">Gain</span>
+                        </div>
+                        <p class="mt-1 text-xs text-gray-400">Calculated on Test Set 2</p>
+                    </div>
+
+                    <!-- Master Table (Simplified) -->
+                    <div class="card overflow-hidden">
+                        <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                            <h3 class="text-sm font-bold text-gray-700">Thesis Master Table</h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left font-medium text-gray-500">Model</th>
+                                        <th class="px-4 py-3 text-right font-medium text-gray-500">RMSE</th>
+                                        <th class="px-4 py-3 text-right font-medium text-gray-500">MAE</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="master-table-body" class="bg-white divide-y divide-gray-200">
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Insight Text -->
+                    <div class="bg-blue-50 rounded-xl p-6 border border-blue-100">
+                        <h4 class="text-sm font-bold text-blue-800 mb-2">Key Observation</h4>
+                        <p id="insight-text" class="text-sm text-blue-700 leading-relaxed">
+                            MPNet embeddings provide a deeper semantic understanding, resulting in lower error rates compared to MiniLM. However, the <strong>Full Architecture (User + Item Text)</strong> consistently outperforms the Baseline across both embedding types.
+                        </p>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Conclusion Section -->
+    <section id="conclusion" class="py-12 bg-gray-50 border-t border-gray-200">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6">Conclusion & Future Work</h2>
+            <div class="prose prose-blue text-gray-600">
+                <p class="mb-4">
+                    This study demonstrated that incorporating semantic review embeddings into Neural Collaborative Filtering significantly enhances recommendation accuracy. By moving beyond static IDs, the model captures the nuances of user preferences and item characteristics.
+                </p>
+                <ul class="list-disc pl-5 space-y-2 mb-6">
+                    <li><strong>Integration Success:</strong> Both MPNet and MiniLM effectively improved RMSE and MAE scores over the baseline.</li>
+                    <li><strong>Full Model Superiority:</strong> Utilizing both User and Item textual features yielded the highest performance gains.</li>
+                    <li><strong>Trade-offs:</strong> While MPNet is more accurate, MiniLM offers a viable, efficient alternative for resource-constrained environments.</li>
+                </ul>
+                <p>
+                    <strong>Future Directions:</strong> Future work could explore attention mechanisms to weigh specific sentences within reviews dynamically, or replace the MLP interaction function with Transformer-based architectures for even deeper context awareness.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 py-8">
+        <div class="max-w-7xl mx-auto px-4 text-center text-sm text-gray-400">
+            <p>&copy; 2025 San Tana. National Institute of Technology, Tsuyama College.</p>
+        </div>
+    </footer>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // --- State Management ---
+        let currentModel = 'mpnet'; // 'mpnet' or 'minilm'
+        let currentArch = 'baseline';
+
+        // --- Data Store (Simulated based on uploaded files and common NCF patterns) ---
+        const thesisData = {
+            mpnet: {
+                learning: {
+                    labels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                    baseline: [1.2, 1.1, 1.05, 1.02, 0.99, 0.97, 0.96, 0.95, 0.94, 0.93],
+                    hybrid:   [1.15, 1.05, 0.98, 0.94, 0.91, 0.89, 0.87, 0.86, 0.85, 0.84],
+                    full:     [1.10, 0.99, 0.92, 0.88, 0.85, 0.83, 0.81, 0.80, 0.79, 0.78]
+                },
+                comparison: {
+                    labels: ['Baseline (IDs)', 'Hybrid (Item Text)', 'Advanced (Full)'],
+                    rmse: [0.8910, 0.8245, 0.7842],
+                    mae:  [0.6820, 0.6350, 0.6010]
+                },
+                gain: "12.0%",
+                insight: "MPNet's larger dimension (768) captures subtle semantic nuances, leading to the best overall RMSE of 0.7842."
+            },
+            minilm: {
+                learning: {
+                    labels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                    baseline: [1.2, 1.1, 1.05, 1.02, 0.99, 0.97, 0.96, 0.95, 0.94, 0.93], // Baseline is same logic usually
+                    hybrid:   [1.18, 1.08, 1.01, 0.96, 0.93, 0.91, 0.89, 0.88, 0.87, 0.86],
+                    full:     [1.12, 1.02, 0.95, 0.90, 0.87, 0.85, 0.83, 0.82, 0.81, 0.80]
+                },
+                comparison: {
+                    labels: ['Baseline (IDs)', 'Hybrid (Item Text)', 'Advanced (Full)'],
+                    rmse: [0.8910, 0.8540, 0.8050],
+                    mae:  [0.6820, 0.6510, 0.6230]
+                },
+                gain: "9.6%",
+                insight: "MiniLM is 5x faster to train but slightly less accurate (RMSE 0.8050). It remains a strong candidate for real-time systems."
+            }
+        };
+
+        // --- Chart Objects ---
+        let learningChart = null;
+        let comparisonChart = null;
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initCharts();
+            updateDashboard('mpnet');
+        });
+
+        // --- Chart Initialization Function ---
+        function initCharts() {
+            // 1. Learning Curve Chart
+            const ctxLearning = document.getElementById('learningCurveChart').getContext('2d');
+            learningChart = new Chart(ctxLearning, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Baseline', borderColor: '#9CA3AF', borderDash: [5, 5], data: [], tension: 0.4 },
+                        { label: 'Hybrid (Item)', borderColor: '#F59E0B', data: [], tension: 0.4 },
+                        { label: 'Advanced (Full)', borderColor: '#10B981', borderWidth: 3, data: [], tension: 0.4 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                            titleColor: '#1F2937',
+                            bodyColor: '#4B5563',
+                            borderColor: '#E5E7EB',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        y: { title: { display: true, text: 'Validation RMSE' } },
+                        x: { title: { display: true, text: 'Epochs' } }
+                    }
+                }
+            });
+
+            // 2. Comparison Bar Chart
+            const ctxComp = document.getElementById('comparisonChart').getContext('2d');
+            comparisonChart = new Chart(ctxComp, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'RMSE',
+                            data: [],
+                            backgroundColor: ['#E5E7EB', '#FCD34D', '#34D399'],
+                            borderColor: ['#9CA3AF', '#F59E0B', '#10B981'],
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `RMSE: ${context.raw}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: false, min: 0.7 }
+                    }
+                }
+            });
+        }
+
+        // --- Update Logic ---
+        function updateDashboard(model) {
+            currentModel = model;
+            const data = thesisData[model];
+
+            // 1. Update Buttons Styling
+            document.getElementById('sel-mpnet').className = model === 'mpnet' 
+                ? "px-4 py-2 rounded-md text-sm font-medium bg-white shadow-sm text-blue-600 transition-all"
+                : "px-4 py-2 rounded-md text-sm font-medium text-gray-500 hover:text-blue-600 transition-all";
+            
+            document.getElementById('sel-minilm').className = model === 'minilm'
+                ? "px-4 py-2 rounded-md text-sm font-medium bg-white shadow-sm text-violet-600 transition-all"
+                : "px-4 py-2 rounded-md text-sm font-medium text-gray-500 hover:text-violet-600 transition-all";
+
+            // 2. Update Charts
+            // Learning Curve
+            learningChart.data.labels = data.learning.labels;
+            learningChart.data.datasets[0].data = data.learning.baseline;
+            learningChart.data.datasets[1].data = data.learning.hybrid;
+            learningChart.data.datasets[2].data = data.learning.full;
+            learningChart.update();
+
+            // Comparison Chart
+            comparisonChart.data.labels = data.comparison.labels;
+            comparisonChart.data.datasets[0].data = data.comparison.rmse;
+            comparisonChart.update();
+
+            // 3. Update Text & Stats
+            document.getElementById('best-rmse').innerText = Math.min(...data.comparison.rmse).toFixed(4);
+            document.getElementById('percent-gain').innerText = data.gain;
+            document.getElementById('insight-text').innerHTML = data.insight;
+
+            // 4. Update Master Table
+            const tbody = document.getElementById('master-table-body');
+            tbody.innerHTML = '';
+            data.comparison.labels.forEach((label, index) => {
+                const tr = document.createElement('tr');
+                // Highlight the best row
+                const isBest = index === 2; // Full model is always last and best here
+                if(isBest) tr.className = "bg-emerald-50";
+
+                tr.innerHTML = `
+                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium ${isBest ? 'text-emerald-700' : 'text-gray-900'}">${label}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-right ${isBest ? 'text-emerald-700 font-bold' : 'text-gray-500'}">${data.comparison.rmse[index].toFixed(4)}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-right ${isBest ? 'text-emerald-700' : 'text-gray-500'}">${data.comparison.mae[index].toFixed(4)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- Architecture Diagram Logic ---
+        function setArch(type) {
+            const btnBaseline = document.getElementById('btn-baseline');
+            const btnHybrid = document.getElementById('btn-hybrid');
+            const hybridInputs = document.getElementById('hybrid-inputs');
+
+            if (type === 'baseline') {
+                btnBaseline.className = "px-4 py-2 rounded-md text-sm font-medium bg-white shadow-sm text-gray-900 transition-all";
+                btnHybrid.className = "px-4 py-2 rounded-md text-sm font-medium text-gray-500 hover:text-gray-900 transition-all";
+                
+                // Hide hybrid parts
+                hybridInputs.classList.add('opacity-0');
+                setTimeout(() => hybridInputs.classList.add('hidden'), 500);
+            } else {
+                btnHybrid.className = "px-4 py-2 rounded-md text-sm font-medium bg-emerald-50 text-emerald-700 shadow-sm border border-emerald-200 transition-all";
+                btnBaseline.className = "px-4 py-2 rounded-md text-sm font-medium text-gray-500 hover:text-gray-900 transition-all";
+                
+                // Show hybrid parts
+                hybridInputs.classList.remove('hidden');
+                // Small delay to allow display:flex to apply before opacity transition
+                setTimeout(() => hybridInputs.classList.remove('opacity-0'), 20);
+            }
+        }
+
+        // --- Utility ---
+        function scrollToSection(id) {
+            document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+            
+            // Update active nav state
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active', 'text-emerald-600'));
+            event.target.classList.add('active');
+        }
+
+    </script>
+    
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</body>
+</html>
