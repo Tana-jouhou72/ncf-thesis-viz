@@ -5,292 +5,417 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Dual-Side Semantic NCF-AG | San Tana</title>
 <meta name="description" content="Graduation research thesis (NIT Tsuyama College, 2026): enhancing Neural Collaborative Filtering by Aggregation with dual-side semantic review embeddings. Test RMSE 0.8163 on 3 million TripAdvisor hotel ratings." />
-<meta name="theme-color" content="#F5F7FA" media="(prefers-color-scheme: light)" />
-<meta name="theme-color" content="#0E131A" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#0A1433" />
 <meta property="og:title" content="Enhancing Neural Collaborative Filtering by Aggregation with Dual-Side Semantic Review Embeddings" />
 <meta property="og:description" content="Fusing user and hotel review embeddings (MPNet / MiniLM) into NCF-AG. Best test RMSE 0.8163, 4.47% lower than the NCF-AG baseline." />
+<script>
+  /* Pick the language before anything is drawn: ?lang=ja|en, then the saved choice, then the browser language. */
+  (function () {
+    var q = new URLSearchParams(location.search).get('lang');
+    var saved = null;
+    try { saved = localStorage.getItem('thesis-lang'); } catch (e) {}
+    var lang = q === 'ja' || q === 'en' ? q : saved || ((navigator.language || '').toLowerCase().indexOf('ja') === 0 ? 'ja' : 'en');
+    document.documentElement.lang = lang;
+  })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+JP:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous" />
 <style>
   :root {
-    --bg: #F5F7FA;
+    --bg: #F3F5F9;
     --surface: #FFFFFF;
-    --ink: #16202E;
-    --ink-2: #4A5566;
-    --ink-3: #6B7685;
-    --line: #DCE1E8;
-    --line-2: #EBEEF2;
-    /* the four parts of the input vector, and the four models (colours taken from the thesis figures) */
-    --c-uid: #4F6380;   /* user ID  p_u  */
-    --c-iid: #8E9CB0;   /* item ID  q_i  */
-    --c-item: #1C9883;  /* item text t'_i  · Item-Text hybrid */
-    --c-user: #D4931A;  /* user text t'_u  · User-Text hybrid */
-    --c-dual: #3343C2;  /* proposed Dual-Side */
-    --c-base: #97A1AD;  /* baseline NCF-AG */
+    --surface-2: #F7F9FC;
+    --ink: #121A2B;
+    --ink-2: #465467;
+    --ink-3: #6A7689;
+    --line: #E1E6EE;
+    --line-2: #ECF0F5;
+    --navy-1: #0A1433;
+    --navy-2: #15275F;
+    /* the four parts of the input vector and the four models (colours from the thesis figures) */
+    --c-uid: #4F6380;
+    --c-iid: #8E9CB0;
+    --c-item: #1C9883;
+    --c-user: #D4931A;
+    --c-dual: #3343C2;
+    --c-base: #97A1AD;
     --c-mf: #E07A2F;
-    --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --sans: "IBM Plex Sans", "IBM Plex Sans JP", system-ui, -apple-system, "Segoe UI", sans-serif;
     --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
-    --measure: 68ch;
-    --wide: 1080px;
-    --radius: 10px;
+    --ja: "IBM Plex Sans JP", "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif;
+    --body: var(--serif);
+    --measure: 70ch;
+    --wide: 1120px;
+    --r-lg: 18px;
+    --shadow-sm: 0 1px 2px rgba(16, 24, 40, .05);
+    --shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 10px 28px -10px rgba(16, 24, 40, .12);
+    --top-h: 60px;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #0E131A; --surface: #151C25; --ink: #E7ECF2; --ink-2: #A9B4C1; --ink-3: #8592A2;
-      --line: #2A3442; --line-2: #1E2732;
+      --bg: #0C1119; --surface: #141B26; --surface-2: #18202C; --ink: #E7ECF3; --ink-2: #A8B3C2; --ink-3: #8591A2;
+      --line: #263142; --line-2: #1D2633;
       --c-uid: #7F96B8; --c-iid: #A9B7C9; --c-item: #3CC4AC; --c-user: #EDB44B; --c-dual: #8391F7; --c-base: #6E7987; --c-mf: #F09A55;
+      --shadow-sm: none; --shadow: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 12px 30px -12px rgba(0, 0, 0, .6);
       color-scheme: dark;
     }
   }
+  html[lang="ja"] { --body: var(--ja); }
+  html[lang="ja"] [data-l="en"], html[lang="en"] [data-l="ja"] { display: none !important; }
+  html[lang="ja"] :is(h1, h2, h3, h4, .lead, .kpi span, .findings b, .future b, .pipeline b, .byline) { word-break: auto-phrase; }
+  html[lang="ja"] :is(.in b, .vec-labels b) { word-break: keep-all; overflow-wrap: anywhere; }
+
   * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
-  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation: none !important; transition: none !important; } }
-  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--serif); font-size: 18px; line-height: 1.7; -webkit-font-smoothing: antialiased; }
+  html { scroll-padding-top: calc(var(--top-h) + 16px); }
+  @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 18px; line-height: 1.7; -webkit-font-smoothing: antialiased; }
+  html[lang="ja"] body { font-size: 16.5px; line-height: 1.9; letter-spacing: .01em; }
   a { color: var(--c-dual); text-underline-offset: 3px; }
-  :focus-visible { outline: 2px solid var(--c-dual); outline-offset: 2px; border-radius: 4px; }
-  h1, h2, h3, h4 { font-family: var(--sans); color: var(--ink); line-height: 1.2; }
+  :focus-visible { outline: 2px solid var(--c-dual); outline-offset: 2px; border-radius: 6px; }
+  h1, h2, h3, h4 { font-family: var(--sans); color: var(--ink); line-height: 1.25; }
+  html[lang="ja"] h1, html[lang="ja"] h2, html[lang="ja"] h3, html[lang="ja"] h4 { font-family: var(--ja); line-height: 1.45; }
   p { margin: 0 0 1em; }
-  .sans { font-family: var(--sans); }
   .wrap { max-width: var(--wide); margin: 0 auto; padding: 0 24px; }
   .prose { max-width: var(--measure); }
-  .muted { color: var(--ink-2); }
   sub, sup { line-height: 0; }
 
-  /* ---------- top bar ---------- */
-  .top { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line-2); }
-  .top .wrap { display: flex; align-items: center; gap: 24px; height: 56px; }
+  /* ---------- top bar: clear over the hero, light glass after it ---------- */
+  .top { position: sticky; top: 0; z-index: 30; height: var(--top-h); background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px); border-bottom: 1px solid var(--line); transition: background .25s, border-color .25s; }
+  .top .wrap { display: flex; align-items: center; gap: 18px; height: 100%; }
   .brand { font-family: var(--sans); font-weight: 600; font-size: .95rem; color: var(--ink); text-decoration: none; white-space: nowrap; display: flex; align-items: center; gap: 10px; }
   .brand-mark { display: inline-flex; gap: 2px; }
-  .brand-mark i { width: 6px; height: 16px; border-radius: 2px; display: block; }
-  .nav { display: flex; gap: 4px; margin-left: auto; overflow-x: auto; scrollbar-width: none; }
+  .brand-mark i { width: 5px; height: 18px; border-radius: 2px; display: block; }
+  .nav { display: flex; gap: 2px; margin-left: auto; overflow-x: auto; scrollbar-width: none; min-width: 0; }
   .nav::-webkit-scrollbar { display: none; }
-  .nav a { font-family: var(--sans); font-size: .875rem; color: var(--ink-2); text-decoration: none; padding: 6px 10px; border-radius: 6px; white-space: nowrap; }
-  .nav a:hover { color: var(--ink); background: var(--line-2); }
-  .nav a.on { color: var(--ink); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
-  .nav .n { color: var(--ink-3); margin-right: 4px; font-variant-numeric: tabular-nums; }
+  .nav a { font-family: var(--sans); font-size: .875rem; color: var(--ink-2); text-decoration: none; padding: 7px 11px; border-radius: 99px; white-space: nowrap; transition: background .2s, color .2s; }
+  html[lang="ja"] .nav a { font-family: var(--ja); }
+  .nav a:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 6%, transparent); }
+  .nav a.on { color: var(--ink); background: color-mix(in srgb, var(--ink) 8%, transparent); }
+  .nav .n { opacity: .6; margin-right: 5px; font-variant-numeric: tabular-nums; }
+  .lang { display: inline-flex; padding: 3px; border-radius: 99px; border: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 70%, transparent); flex: none; }
+  .lang button { font-family: var(--sans); font-size: .8rem; font-weight: 500; border: 0; background: none; color: var(--ink-2); padding: 5px 11px; border-radius: 99px; cursor: pointer; }
+  .lang button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+  .top.on-hero { background: transparent; border-bottom-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .top.on-hero .brand, .top.on-hero .nav a.on, .top.on-hero .nav a:hover { color: #fff; }
+  .top.on-hero .nav a { color: rgba(232, 237, 247, .78); }
+  .top.on-hero .nav a.on, .top.on-hero .nav a:hover { background: rgba(255, 255, 255, .1); }
+  .top.on-hero .lang { border-color: rgba(255, 255, 255, .2); background: rgba(255, 255, 255, .06); }
+  .top.on-hero .lang button { color: rgba(232, 237, 247, .8); }
+  .top.on-hero .lang button[aria-pressed="true"] { background: #fff; color: var(--navy-1); }
+  @media (max-width: 760px) { .brand-text { display: none; } .nav a { padding: 7px 9px; font-size: .84rem; } .nav .n { display: none; } }
 
   /* ---------- hero ---------- */
-  .hero { padding: 72px 0 56px; }
-  .hero-kind { font-family: var(--sans); font-size: .95rem; color: var(--ink-2); margin: 0 0 18px; }
-  .hero h1 { font-size: clamp(1.9rem, 1.2rem + 2.6vw, 3.05rem); font-weight: 600; letter-spacing: -0.015em; margin: 0 0 22px; max-width: 22ch; text-wrap: balance; }
-  .byline { font-family: var(--sans); font-size: 1rem; color: var(--ink-2); margin: 0 0 44px; line-height: 1.6; }
-  .byline b { color: var(--ink); font-weight: 600; }
+  .hero { position: relative; margin-top: calc(-1 * var(--top-h)); padding: calc(var(--top-h) + 76px) 0 64px; color: #E6EBF5; overflow: hidden; isolation: isolate;
+    background:
+      radial-gradient(900px 480px at 88% -8%, rgba(92, 104, 255, .42), transparent 62%),
+      radial-gradient(700px 420px at -6% 105%, rgba(28, 152, 131, .28), transparent 60%),
+      linear-gradient(165deg, var(--navy-1) 0%, var(--navy-2) 58%, #0F1D4A 100%); }
+  .hero::before { content: ""; position: absolute; inset: 0; z-index: -1; background-image: radial-gradient(rgba(255, 255, 255, .09) 1px, transparent 1.2px); background-size: 24px 24px; -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.6) 55%, transparent 100%); mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.6) 55%, transparent 100%); }
+  .pill { display: inline-flex; align-items: center; gap: 8px; font-family: var(--sans); font-size: .85rem; color: #D7DEEE; padding: 6px 14px 6px 8px; border-radius: 99px; border: 1px solid rgba(255, 255, 255, .16); background: rgba(255, 255, 255, .05); margin: 0 0 24px; }
+  .pill i { width: 8px; height: 8px; border-radius: 50%; background: #5EE1C8; box-shadow: 0 0 0 4px rgba(94, 225, 200, .18); margin-left: 4px; }
+  html[lang="ja"] .pill { font-family: var(--ja); }
+  .hero h1 { color: #fff; font-size: clamp(1.95rem, 1.15rem + 2.7vw, 3.2rem); font-weight: 600; letter-spacing: -0.02em; margin: 0 0 14px; max-width: 24ch; text-wrap: balance; }
+  html[lang="ja"] .hero h1 { letter-spacing: 0; font-size: clamp(1.6rem, 1rem + 2.2vw, 2.6rem); max-width: 28ch; line-height: 1.4; }
+  .orig { font-family: var(--sans); font-size: .95rem; color: rgba(214, 222, 238, .7); margin: 0 0 20px; max-width: 70ch; }
+  .byline { font-family: var(--sans); font-size: 1rem; color: rgba(222, 229, 242, .82); margin: 0 0 30px; line-height: 1.65; }
+  html[lang="ja"] .byline { font-family: var(--ja); }
+  .byline b { color: #fff; font-weight: 600; }
+  .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 52px; }
+  .btn { font-family: var(--sans); font-size: .95rem; font-weight: 600; text-decoration: none; padding: 11px 18px; border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; transition: transform .15s, background .2s, border-color .2s; }
+  html[lang="ja"] .btn { font-family: var(--ja); }
+  .btn:active { transform: translateY(1px); }
+  .btn.primary { background: #fff; color: var(--navy-1); box-shadow: 0 8px 24px -10px rgba(0, 0, 0, .6); }
+  .btn.primary:hover { background: #EEF1FF; }
+  .btn.ghost { color: #fff; border: 1px solid rgba(255, 255, 255, .28); background: rgba(255, 255, 255, .04); }
+  .btn.ghost:hover { border-color: rgba(255, 255, 255, .5); background: rgba(255, 255, 255, .08); }
+  .btn svg { width: 16px; height: 16px; }
 
   /* the input vector z0 — the page's signature */
-  .vec { max-width: 860px; }
-  .vec-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; height: 64px; }
-  .seg { position: relative; border-radius: 4px; display: flex; align-items: center; padding: 0 14px; color: #fff; font-family: var(--sans); font-weight: 600; font-size: 1.05rem; overflow: hidden; transform-origin: left center; }
+  .vec { max-width: 900px; }
+  .vec-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; height: 66px; padding: 4px; border-radius: 14px; background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .1); }
+  .seg { position: relative; border-radius: 9px; display: flex; align-items: center; padding: 0 14px; color: #fff; font-family: var(--sans); font-weight: 600; font-size: 1.05rem; overflow: hidden; transform-origin: left center; }
   .seg .kx { color: #fff; }
-  .seg.uid { background: var(--c-uid); } .seg.iid { background: var(--c-iid); } .seg.itx { background: var(--c-item); } .seg.utx { background: var(--c-user); }
-  @media (prefers-color-scheme: dark) { .seg, .seg .kx { color: #0E131A; } }
-  .seg::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(100% / 16 - 1px), rgba(255,255,255,.18) calc(100% / 16 - 1px) calc(100% / 16)); }
-  .vec-labels { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; margin-top: 10px; font-family: var(--sans); font-size: .85rem; color: var(--ink-2); line-height: 1.4; }
-  .vec-labels b { display: block; color: var(--ink); font-weight: 500; }
-  .vec-caption { font-family: var(--sans); font-size: .9rem; color: var(--ink-3); margin-top: 14px; }
-  @media (max-width: 560px) {
-    .hero { padding: 40px 0 44px; }
-    .vec-bar { height: 52px; }
-    .vec-labels { font-size: .78rem; }
-    .vec-labels span { overflow-wrap: anywhere; }
-    .vec-labels b { font-size: .82rem; }
-    .vec-labels .why { display: none; }
-    .brand-text { display: none; }
-  }
-  .hero .seg { animation: grow .7s cubic-bezier(.2,.7,.2,1) both; }
-  .hero .seg:nth-child(2) { animation-delay: .12s; } .hero .seg:nth-child(3) { animation-delay: .24s; } .hero .seg:nth-child(4) { animation-delay: .36s; }
+  .seg.uid { background: linear-gradient(180deg, #6177A0, #4F6380); } .seg.iid { background: linear-gradient(180deg, #A2B0C4, #8696AC); }
+  .seg.itx { background: linear-gradient(180deg, #2BB39C, #1C9883); box-shadow: 0 8px 26px -8px rgba(43, 179, 156, .7); }
+  .seg.utx { background: linear-gradient(180deg, #E8A93A, #D4931A); box-shadow: 0 8px 26px -8px rgba(232, 169, 58, .7); }
+  .seg::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(100% / 16 - 1px), rgba(255, 255, 255, .16) calc(100% / 16 - 1px) calc(100% / 16)); }
+  .vec-labels { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 10px; padding: 0 4px; font-family: var(--sans); font-size: .84rem; color: rgba(214, 222, 238, .72); line-height: 1.4; }
+  html[lang="ja"] .vec-labels, html[lang="ja"] .vec-caption { font-family: var(--ja); }
+  .vec-labels b { display: block; color: #fff; font-weight: 500; }
+  .vec-caption { font-family: var(--sans); font-size: .9rem; color: rgba(214, 222, 238, .62); margin: 14px 0 0; padding: 0 4px; }
+  .hero .seg { animation: grow .8s cubic-bezier(.2, .7, .2, 1) both; }
+  .hero .seg:nth-child(2) { animation-delay: .1s; } .hero .seg:nth-child(3) { animation-delay: .2s; } .hero .seg:nth-child(4) { animation-delay: .3s; }
   @keyframes grow { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
 
-  .headline { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; margin-top: 56px; padding-top: 28px; border-top: 1px solid var(--line); max-width: 960px; }
-  .headline p { font-size: 1rem; line-height: 1.55; color: var(--ink-2); margin: 0; }
-  .headline strong { display: block; font-family: var(--sans); font-size: 1.6rem; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
-  @media (max-width: 760px) { .headline { grid-template-columns: 1fr; gap: 20px; } }
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 44px; }
+  .kpi { border-radius: 14px; border: 1px solid rgba(255, 255, 255, .12); background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .03)); padding: 18px 18px 16px; }
+  .kpi strong { display: block; font-family: var(--sans); font-size: 1.85rem; font-weight: 600; color: #fff; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.15; margin-bottom: 6px; }
+  .kpi span { font-family: var(--sans); font-size: .87rem; line-height: 1.45; color: rgba(214, 222, 238, .78); display: block; }
+  html[lang="ja"] .kpi span { font-family: var(--ja); }
+  @media (max-width: 900px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 560px) {
+    .hero { padding: calc(var(--top-h) + 40px) 0 44px; }
+    .vec-bar { height: 54px; }
+    .vec-labels { font-size: .76rem; }
+    .vec-labels span { overflow-wrap: anywhere; }
+    .vec-labels .why { display: none; }
+    .kpi { padding: 14px; } .kpi strong { font-size: 1.45rem; }
+    .cta { margin-bottom: 40px; }
+  }
 
   /* ---------- sections ---------- */
-  section.chapter { padding: 72px 0; border-top: 1px solid var(--line); }
-  .ch-head { display: grid; grid-template-columns: 56px 1fr; align-items: baseline; margin-bottom: 28px; }
-  .ch-num { font-family: var(--sans); font-size: 1.05rem; color: var(--ink-3); font-variant-numeric: tabular-nums; }
-  .ch-head h2 { font-size: clamp(1.5rem, 1.2rem + 1vw, 2rem); font-weight: 600; margin: 0; letter-spacing: -0.01em; }
-  .ch-body { padding-left: 56px; }
-  @media (max-width: 760px) { .ch-head { grid-template-columns: 40px 1fr; } .ch-body { padding-left: 0; } }
-  h3 { font-size: 1.2rem; font-weight: 600; margin: 48px 0 14px; }
-  h3:first-child { margin-top: 0; }
-  .lead { font-size: 1.22rem; line-height: 1.6; color: var(--ink); }
+  section.chapter { padding: 88px 0 24px; }
+  .ch-head { display: flex; align-items: center; gap: 14px; margin-bottom: 30px; }
+  .ch-num { width: 38px; height: 38px; flex: none; display: grid; place-items: center; border-radius: 11px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-sm); font-family: var(--sans); font-weight: 600; font-size: 1rem; color: var(--c-dual); font-variant-numeric: tabular-nums; }
+  .ch-head h2 { font-size: clamp(1.55rem, 1.2rem + 1.1vw, 2.1rem); font-weight: 600; margin: 0; letter-spacing: -0.015em; }
+  html[lang="ja"] .ch-head h2 { letter-spacing: 0; }
+  h3 { font-size: 1.22rem; font-weight: 600; margin: 52px 0 16px; letter-spacing: -0.005em; }
+  .lead { font-size: 1.24rem; line-height: 1.6; color: var(--ink); }
+  html[lang="ja"] .lead { font-size: 1.12rem; line-height: 1.85; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow); }
+  .note { font-family: var(--sans); font-size: .86rem; color: var(--ink-3); line-height: 1.55; }
+  html[lang="ja"] .note { font-family: var(--ja); }
 
-  /* ---------- background: MF → NCF → NCF-AG ---------- */
-  .lineage { list-style: none; padding: 0; margin: 28px 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
-  .lineage li { padding: 22px 22px 18px; position: relative; }
-  .lineage li + li { border-left: 1px solid var(--line); }
+  .intro { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 40px; align-items: start; }
+  .tasks { padding: 24px; }
+  .tasks h4 { margin: 0 0 14px; font-size: 1rem; font-weight: 600; }
+  .tasks ol { list-style: none; counter-reset: t; margin: 0; padding: 0; display: grid; gap: 14px; }
+  .tasks li { counter-increment: t; display: grid; grid-template-columns: 30px 1fr; gap: 12px; font-size: 1rem; line-height: 1.6; color: var(--ink-2); }
+  .tasks li::before { content: counter(t); width: 28px; height: 28px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); display: grid; place-items: center; font-family: var(--sans); font-size: .85rem; font-weight: 600; color: var(--ink); }
+  .tasks li:last-child::before { background: var(--c-dual); border-color: var(--c-dual); color: #fff; }
+  @media (max-width: 900px) { .intro { grid-template-columns: 1fr; gap: 8px; } }
+
+  /* background: MF → NCF → NCF-AG */
+  .lineage { list-style: none; padding: 0; margin: 28px 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .lineage li { padding: 22px 22px 16px; position: relative; display: flex; flex-direction: column; }
+  .lineage li + li::before { content: ""; position: absolute; left: -15px; top: 50%; width: 10px; height: 10px; border-top: 2px solid var(--ink-3); border-right: 2px solid var(--ink-3); transform: translateY(-50%) rotate(45deg); opacity: .5; }
   .lineage h4 { margin: 0 0 2px; font-size: 1.05rem; font-weight: 600; }
   .lineage .cite { font-family: var(--sans); font-size: .82rem; color: var(--ink-3); margin: 0 0 12px; }
-  .lineage p { font-size: .97rem; line-height: 1.6; color: var(--ink-2); margin: 0 0 12px; }
-  .lineage .eq { margin: 4px 0 0; overflow-x: auto; overflow-y: hidden; font-size: .95rem; color: var(--ink); }
-  .lineage li:last-child { background: color-mix(in srgb, var(--c-dual) 5%, var(--surface)); }
-  @media (max-width: 860px) { .lineage { grid-template-columns: 1fr; } .lineage li + li { border-left: 0; border-top: 1px solid var(--line); } }
+  .lineage p { font-size: .98rem; line-height: 1.6; color: var(--ink-2); margin: 0 0 12px; }
+  html[lang="ja"] .lineage p { font-size: .94rem; line-height: 1.8; }
+  .lineage .eq { margin: auto 0 0; padding-top: 6px; overflow-x: auto; overflow-y: hidden; font-size: .95rem; color: var(--ink); border-top: 1px dashed var(--line); }
+  .lineage li.is-base { border-color: color-mix(in srgb, var(--c-dual) 45%, var(--line)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-dual) 10%, transparent), var(--shadow); }
+  .tag { display: inline-block; align-self: flex-start; font-family: var(--sans); font-size: .76rem; font-weight: 600; color: var(--c-dual); background: color-mix(in srgb, var(--c-dual) 10%, transparent); border-radius: 99px; padding: 2px 10px; margin-bottom: 10px; }
+  html[lang="ja"] .tag { font-family: var(--ja); }
+  @media (max-width: 900px) { .lineage { grid-template-columns: 1fr; gap: 14px; } .lineage li + li::before { display: none; } }
 
-  /* ---------- data pipeline ---------- */
-  .pipeline { list-style: none; padding: 0; margin: 24px 0 0; counter-reset: step; max-width: var(--measure); }
-  .pipeline li { position: relative; padding: 0 0 22px 44px; }
-  .pipeline li::before { counter-increment: step; content: counter(step); position: absolute; left: 0; top: 2px; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); font-family: var(--sans); font-size: .8rem; display: grid; place-items: center; color: var(--ink-2); }
-  .pipeline li::after { content: ""; position: absolute; left: 13px; top: 30px; bottom: 4px; width: 1px; background: var(--line); }
+  /* data pipeline */
+  .data-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+  @media (max-width: 900px) { .data-grid { grid-template-columns: 1fr; } }
+  .pipeline { list-style: none; padding: 24px 24px 6px; margin: 0; counter-reset: step; }
+  .pipeline li { position: relative; padding: 0 0 20px 44px; }
+  .pipeline li::before { counter-increment: step; content: counter(step); position: absolute; left: 0; top: 1px; width: 28px; height: 28px; border-radius: 50%; background: var(--surface-2); border: 1px solid var(--line); font-family: var(--sans); font-size: .82rem; font-weight: 600; display: grid; place-items: center; color: var(--ink-2); }
+  .pipeline li::after { content: ""; position: absolute; left: 14px; top: 32px; bottom: 4px; width: 1px; background: var(--line); }
   .pipeline li:last-child::after { display: none; }
+  .pipeline li:last-child::before { background: var(--c-dual); border-color: var(--c-dual); color: #fff; }
   .pipeline b { font-family: var(--sans); font-weight: 600; font-size: 1rem; display: block; margin-bottom: 2px; }
-  .pipeline span { color: var(--ink-2); font-size: 1rem; line-height: 1.6; }
-  .criteria { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
-  .criteria li { font-family: var(--sans); font-size: .82rem; border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 2px 10px; color: var(--ink-2); }
+  html[lang="ja"] .pipeline b { font-family: var(--ja); }
+  .pipeline span { color: var(--ink-2); font-size: .98rem; line-height: 1.6; }
+  .criteria { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 0; padding: 0; list-style: none; }
+  .criteria li { font-family: var(--sans); font-size: .82rem; border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 3px 11px; color: var(--ink-2); }
+  html[lang="ja"] .criteria li { font-family: var(--ja); }
+  .stats { padding: 6px 22px; margin: 0; }
+  .stats div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line-2); }
+  .stats div:first-child { border-top: 0; }
+  .stats dt { font-family: var(--sans); font-size: .92rem; color: var(--ink-2); }
+  html[lang="ja"] .stats dt { font-family: var(--ja); }
+  .stats dd { margin: 0; font-family: var(--sans); font-size: 1.4rem; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .stats-cap { padding: 0 22px 18px; margin: 0; }
 
-  .stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); margin: 28px 0 10px; }
-  .stats div { padding: 18px 18px 16px; }
-  .stats div + div { border-left: 1px solid var(--line); }
-  .stats dt { font-family: var(--sans); font-size: .85rem; color: var(--ink-2); margin-bottom: 4px; }
-  .stats dd { margin: 0; font-family: var(--sans); font-size: 1.45rem; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
-  @media (max-width: 860px) { .stats { grid-template-columns: repeat(2, 1fr); } .stats div + div { border-left: 0; } .stats div { border-top: 1px solid var(--line); } .stats div:nth-child(-n+2) { border-top: 0; } .stats div:nth-child(even) { border-left: 1px solid var(--line); } .stats div:last-child { grid-column: 1 / -1; border-left: 0; } }
-  .note { font-family: var(--sans); font-size: .85rem; color: var(--ink-3); line-height: 1.5; }
-
-  /* ---------- architecture explorer ---------- */
-  .tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
-  .tabs button { font-family: var(--sans); font-size: .9rem; font-weight: 500; color: var(--ink-2); background: none; border: 0; border-radius: 7px; padding: 8px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
-  .tabs button:hover { color: var(--ink); background: var(--line-2); }
-  .tabs button[aria-selected="true"] { color: var(--ink); background: var(--line-2); box-shadow: inset 0 0 0 1px var(--line); }
+  /* architecture explorer */
+  .seg-ctl { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-sm); }
+  .seg-ctl button { font-family: var(--sans); font-size: .9rem; font-weight: 500; color: var(--ink-2); background: none; border: 0; border-radius: 9px; padding: 8px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: background .2s, color .2s; }
+  html[lang="ja"] .seg-ctl button { font-family: var(--ja); }
+  .seg-ctl button:hover { color: var(--ink); background: var(--surface-2); }
+  .seg-ctl button[aria-selected="true"] { color: var(--ink); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
   .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
 
-  .arch { margin-top: 20px; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+  .arch { margin-top: 18px; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; align-items: start; }
   @media (max-width: 900px) { .arch { grid-template-columns: 1fr; } }
-  .diagram { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; font-family: var(--sans); }
+  .diagram { padding: 22px; font-family: var(--sans); }
+  html[lang="ja"] .diagram { font-family: var(--ja); }
   .inputs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .in { border-radius: 8px; border: 1px solid var(--line); padding: 10px 10px 8px; font-size: .8rem; line-height: 1.35; color: var(--ink-2); transition: opacity .25s, filter .25s; min-height: 100%; }
+  .in { border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); padding: 10px 10px 8px; font-size: .8rem; line-height: 1.35; color: var(--ink-2); transition: opacity .25s, filter .25s; }
   .in b { display: block; color: var(--ink); font-size: .85rem; font-weight: 600; margin-bottom: 4px; }
-  .in .flow { display: block; margin-top: 6px; color: var(--ink-3); }
+  .in .flow { display: block; margin-top: 6px; color: var(--ink-3); font-family: var(--sans); }
   .in.uid { border-top: 4px solid var(--c-uid); } .in.iid { border-top: 4px solid var(--c-iid); } .in.itx { border-top: 4px solid var(--c-item); } .in.utx { border-top: 4px solid var(--c-user); }
   .off { opacity: .3; filter: grayscale(1); }
-  .arrow { height: 22px; display: grid; place-items: center; color: var(--ink-3); font-size: .8rem; }
+  .arrow { height: 22px; display: grid; place-items: center; }
   .arrow::before { content: ""; width: 1px; height: 100%; background: var(--line); }
-  .zbar { display: flex; gap: 2px; height: 30px; }
-  .zbar span { flex: 1; border-radius: 3px; transition: flex .35s cubic-bezier(.2,.7,.2,1), opacity .25s; }
+  .zbar { display: flex; gap: 3px; height: 30px; padding: 3px; border-radius: 9px; background: var(--surface-2); border: 1px solid var(--line); }
+  .zbar span { flex: 1; border-radius: 5px; transition: flex .35s cubic-bezier(.2, .7, .2, 1), opacity .25s; }
   .zbar .uid { background: var(--c-uid); } .zbar .iid { background: var(--c-iid); } .zbar .itx { background: var(--c-item); } .zbar .utx { background: var(--c-user); }
   .zbar span.gone { flex: 0 0 0; opacity: 0; }
   .zlabel { display: flex; justify-content: space-between; font-size: .8rem; color: var(--ink-2); margin-top: 6px; }
-  .zlabel b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
-  .layer { border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; font-size: .85rem; color: var(--ink-2); display: flex; justify-content: space-between; gap: 10px; align-items: baseline; background: var(--bg); }
-  .layer b { color: var(--ink); font-weight: 600; }
+  .zlabel b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; font-family: var(--sans); }
+  .layer { border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-size: .85rem; color: var(--ink-2); display: flex; justify-content: space-between; gap: 10px; align-items: baseline; background: var(--surface-2); }
+  .layer b { color: var(--ink); font-weight: 600; white-space: nowrap; }
   .mlp { display: grid; gap: 6px; }
-  .mlp .layer:nth-child(1) { margin: 0; } .mlp .layer:nth-child(2) { margin: 0 9%; } .mlp .layer:nth-child(3) { margin: 0 18%; }
+  .mlp .layer:nth-child(2) { margin: 0 9%; } .mlp .layer:nth-child(3) { margin: 0 18%; }
   .heads { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
-  .heads span { border: 1px solid var(--line); border-radius: 6px; font-size: .72rem; text-align: center; padding: 6px 2px; color: var(--ink-2); background: var(--bg); line-height: 1.2; }
-  .out { border-radius: 8px; padding: 10px 12px; color: #fff; font-size: .9rem; font-weight: 600; text-align: center; transition: background .25s; }
-  @media (prefers-color-scheme: dark) { .out { color: #0E131A; } }
-  @media (max-width: 560px) {
-    .inputs { grid-template-columns: repeat(2, 1fr); } .heads { grid-template-columns: repeat(3, 1fr); } .diagram { padding: 14px; }
-    .mlp .layer:nth-child(2) { margin: 0 4%; } .mlp .layer:nth-child(3) { margin: 0 8%; }
-    .tabs { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
-    .tabs.three { grid-template-columns: repeat(3, 1fr); }
-    .tabs button { justify-content: center; padding: 9px 6px; }
-    .tabs .long { display: none; }
-  }
+  .heads > span { border: 1px solid var(--line); border-radius: 7px; font-size: .72rem; text-align: center; padding: 6px 2px; color: var(--ink-2); background: var(--surface-2); line-height: 1.2; }
+  .out { border-radius: 10px; padding: 11px 12px; color: #fff; font-size: .9rem; font-weight: 600; text-align: center; transition: background .25s; }
+  @media (prefers-color-scheme: dark) { .out { color: #0C1119; } }
+  @media (max-width: 560px) { .inputs { grid-template-columns: repeat(2, 1fr); } .heads { grid-template-columns: repeat(3, 1fr); } .diagram { padding: 14px; } .mlp .layer:nth-child(2) { margin: 0 4%; } .mlp .layer:nth-child(3) { margin: 0 8%; } }
 
+  .arch-text { padding: 24px; }
   .arch-text h4 { font-size: 1.15rem; margin: 0 0 6px; font-weight: 600; display: flex; gap: 10px; align-items: center; }
   .arch-text .dims { font-family: var(--sans); font-size: .9rem; color: var(--ink-2); margin: 0 0 14px; }
+  html[lang="ja"] .arch-text .dims { font-family: var(--ja); }
   .arch-text p { font-size: 1.02rem; }
-  .arch-text .eqblock { margin: 14px 0 0; padding: 12px 14px; border-left: 3px solid var(--line); background: var(--surface); border-radius: 0 8px 8px 0; overflow-x: auto; font-size: .95rem; }
+  html[lang="ja"] .arch-text p { font-size: .97rem; }
+  .arch-rmse { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 6px 0 16px; }
+  .arch-rmse div { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface-2); }
+  .arch-rmse span { display: block; font-family: var(--sans); font-size: .78rem; color: var(--ink-3); }
+  html[lang="ja"] .arch-rmse span { font-family: var(--ja); }
+  .arch-rmse b { font-family: var(--sans); font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .eqblock { padding: 12px 14px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); overflow-x: auto; font-size: .95rem; }
 
-  /* ---------- setup ---------- */
-  .spec { display: grid; grid-template-columns: max-content 1fr; gap: 0 28px; margin: 0; max-width: 760px; font-family: var(--sans); font-size: .98rem; }
-  .spec dt, .spec dd { padding: 10px 0; border-top: 1px solid var(--line-2); margin: 0; }
+  /* setup */
+  .exp-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+  @media (max-width: 900px) { .exp-grid { grid-template-columns: 1fr; } }
+  .spec { display: grid; grid-template-columns: max-content 1fr; gap: 0 24px; margin: 0; padding: 8px 22px; font-family: var(--sans); font-size: .96rem; }
+  html[lang="ja"] .spec { font-family: var(--ja); font-size: .92rem; }
+  .spec dt, .spec dd { padding: 12px 0; border-top: 1px solid var(--line-2); margin: 0; }
   .spec dt { color: var(--ink-2); }
-  .spec dd { color: var(--ink); }
   .spec dt:first-of-type, .spec dt:first-of-type + dd { border-top: 0; }
   @media (max-width: 560px) { .spec { grid-template-columns: 1fr; } .spec dd { border-top: 0; padding-top: 0; } }
-  .eqs { display: grid; gap: 10px; margin-top: 22px; max-width: 760px; }
-  .eqs .eqrow { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 16px; overflow-x: auto; }
-  .eqs .eqrow small { font-family: var(--sans); color: var(--ink-3); font-size: .8rem; }
+  .exp-side h4 { margin: 4px 0 6px; font-size: 1.05rem; font-weight: 600; }
+  .exp-side > p { font-size: 1rem; color: var(--ink-2); }
+  .eqs { display: grid; gap: 10px; }
+  .eqrow { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px; padding: 12px 16px; overflow-x: auto; }
+  .eqrow small { font-family: var(--sans); color: var(--ink-3); font-size: .8rem; white-space: nowrap; }
+  html[lang="ja"] .eqrow small { font-family: var(--ja); }
 
-  /* ---------- results ---------- */
-  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; }
-  .panel-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-  .panel-head h4 { font-family: var(--sans); font-size: 1.02rem; font-weight: 600; margin: 0; }
-  .chart-box { position: relative; height: 340px; }
+  /* results */
+  .panel { padding: 22px; }
+  .panel-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .panel-head h4 { font-family: var(--sans); font-size: 1.04rem; font-weight: 600; margin: 0; }
+  html[lang="ja"] .panel-head h4 { font-family: var(--ja); }
+  .chart-box { position: relative; height: 360px; }
   @media (max-width: 560px) { .chart-box { height: 300px; } .panel { padding: 16px; } }
-  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-family: var(--sans); font-size: .85rem; color: var(--ink-2); margin-top: 12px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-family: var(--sans); font-size: .85rem; color: var(--ink-2); margin-top: 14px; }
+  html[lang="ja"] .legend { font-family: var(--ja); }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .legend .tint { opacity: .45; }
-  .grid-2 { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 24px; margin-top: 24px; align-items: start; }
+  .grid-2 { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 24px; margin-top: 24px; align-items: start; }
   @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
 
   table.rt { width: 100%; border-collapse: collapse; font-family: var(--sans); font-size: .95rem; font-variant-numeric: tabular-nums; }
-  .rt caption { text-align: left; font-weight: 600; font-size: 1.02rem; color: var(--ink); padding-bottom: 12px; }
-  .rt th, .rt td { padding: 10px 8px; border-bottom: 1px solid var(--line-2); text-align: right; }
+  html[lang="ja"] table.rt { font-family: var(--ja); }
+  .rt caption { text-align: left; font-weight: 600; font-size: 1.04rem; color: var(--ink); padding-bottom: 12px; }
+  .rt th, .rt td { padding: 11px 8px; border-bottom: 1px solid var(--line-2); text-align: right; }
   .rt th:first-child, .rt td:first-child { text-align: left; padding-left: 0; }
+  .rt td:not(:first-child) { font-family: var(--sans); }
   .rt thead th { font-weight: 500; color: var(--ink-2); font-size: .85rem; border-bottom: 1px solid var(--line); }
   .rt td.m { display: flex; align-items: center; gap: 8px; }
   .rt tr.best td { font-weight: 600; }
+  .rt tr.best { background: color-mix(in srgb, var(--c-dual) 6%, transparent); }
   .rt tr.best td:nth-child(3) { color: var(--c-dual); }
   .rt .na { color: var(--ink-3); }
 
-  .findings { list-style: none; padding: 0; margin: 28px 0 0; display: grid; gap: 0; max-width: 860px; }
-  .findings li { display: grid; grid-template-columns: 6px 1fr; gap: 18px; padding: 18px 0; border-top: 1px solid var(--line-2); }
-  .findings li::before { content: ""; border-radius: 3px; background: var(--fc, var(--line)); }
-  .findings b { font-family: var(--sans); font-size: 1.05rem; font-weight: 600; display: block; margin-bottom: 4px; }
-  .findings p { margin: 0; color: var(--ink-2); font-size: 1rem; }
+  .findings { list-style: none; padding: 0; margin: 24px 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .findings li { padding: 22px; border-top: 4px solid var(--fc); }
+  .findings b { font-family: var(--sans); font-size: 1.04rem; font-weight: 600; display: block; margin-bottom: 8px; line-height: 1.35; }
+  html[lang="ja"] .findings b { font-family: var(--ja); line-height: 1.55; }
+  .findings p { margin: 0; color: var(--ink-2); font-size: .98rem; line-height: 1.65; }
+  html[lang="ja"] .findings p { font-size: .93rem; line-height: 1.85; }
+  .findings .big { display: block; font-family: var(--sans); font-size: 1.6rem; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  @media (max-width: 900px) { .findings { grid-template-columns: 1fr; } }
 
   figure { margin: 0; }
-  .fig { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+  .fig { padding: 14px; }
+  .fig .img { background: #fff; border-radius: 10px; overflow: hidden; }
   .fig img { display: block; width: 100%; height: auto; }
-  figcaption { font-family: var(--sans); font-size: .87rem; color: var(--ink-2); line-height: 1.5; margin-top: 10px; }
+  figcaption { font-family: var(--sans); font-size: .87rem; color: var(--ink-2); line-height: 1.5; margin: 12px 4px 2px; }
+  html[lang="ja"] figcaption { font-family: var(--ja); }
   figcaption b { color: var(--ink); font-weight: 600; }
   .figpair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
   @media (max-width: 760px) { .figpair { grid-template-columns: 1fr; } }
+  .side { align-self: center; }
 
-  /* ---------- conclusion ---------- */
-  .future { list-style: none; padding: 0; margin: 20px 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-  .future li { border-top: 2px solid var(--ink); padding-top: 14px; }
-  .future b { font-family: var(--sans); font-weight: 600; display: block; margin-bottom: 6px; font-size: 1.02rem; }
-  .future span { color: var(--ink-2); font-size: .98rem; line-height: 1.6; display: block; }
-  @media (max-width: 760px) { .future { grid-template-columns: 1fr; } }
+  /* conclusion */
+  .future { list-style: none; padding: 0; margin: 18px 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .future li { padding: 22px; }
+  .future b { font-family: var(--sans); font-weight: 600; display: block; margin-bottom: 8px; font-size: 1.02rem; }
+  html[lang="ja"] .future b { font-family: var(--ja); }
+  .future li > span:not(.ico) { color: var(--ink-2); font-size: .97rem; line-height: 1.65; display: block; }
+  html[lang="ja"] .future li > span:not(.ico) { font-size: .93rem; line-height: 1.85; }
+  .future .ico { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: color-mix(in srgb, var(--c-dual) 10%, transparent); color: var(--c-dual); margin-bottom: 14px; }
+  .future .ico svg { width: 18px; height: 18px; }
+  @media (max-width: 900px) { .future { grid-template-columns: 1fr; } }
 
-  .refs { padding-left: 0; list-style: none; font-size: .95rem; line-height: 1.6; color: var(--ink-2); max-width: 820px; counter-reset: ref; }
-  .refs li { position: relative; padding-left: 40px; margin-bottom: 10px; }
+  .refs { padding: 22px 22px 12px; list-style: none; font-size: .95rem; line-height: 1.6; color: var(--ink-2); counter-reset: ref; margin: 0; }
+  .refs li { position: relative; padding-left: 40px; margin-bottom: 12px; }
   .refs li::before { counter-increment: ref; content: "[" counter(ref) "]"; position: absolute; left: 0; font-family: var(--sans); color: var(--ink-3); font-size: .88rem; }
   .refs a { word-break: break-word; }
 
-  footer { border-top: 1px solid var(--line); padding: 36px 0 48px; font-family: var(--sans); font-size: .88rem; color: var(--ink-3); }
-  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
-  footer a { color: var(--ink-2); }
+  footer { margin-top: 88px; background: linear-gradient(165deg, var(--navy-1), var(--navy-2)); color: rgba(214, 222, 238, .75); padding: 40px 0 48px; font-family: var(--sans); font-size: .9rem; }
+  html[lang="ja"] footer { font-family: var(--ja); }
+  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px; }
+  footer .brand { color: #fff; }
+  footer a.gh { color: #fff; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(255, 255, 255, .25); padding: 8px 14px; border-radius: 10px; }
+  footer a.gh:hover { background: rgba(255, 255, 255, .08); }
+  footer svg { width: 16px; height: 16px; }
 
   .kx { font-size: 1.04em; }
   .katex { font-size: 1.05em; }
   .chart-fallback { font-family: var(--sans); font-size: .9rem; color: var(--ink-3); }
+
+  @media (max-width: 560px) {
+    .seg-ctl { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+    .seg-ctl.three { grid-template-columns: repeat(3, 1fr); }
+    .seg-ctl button { justify-content: center; padding: 9px 6px; }
+    .seg-ctl .long { display: none; }
+    section.chapter { padding-top: 64px; }
+  }
 </style>
 </head>
 <body>
 
-<header class="top">
+<header class="top on-hero" id="topbar">
   <div class="wrap">
-    <a class="brand" href="#top" aria-label="Back to top">
+    <a class="brand" href="#top">
       <span class="brand-mark" aria-hidden="true"><i style="background:var(--c-uid)"></i><i style="background:var(--c-iid)"></i><i style="background:var(--c-item)"></i><i style="background:var(--c-user)"></i></span>
       <span class="brand-text">Dual-Side NCF-AG</span>
     </a>
-    <nav class="nav" aria-label="Sections">
-      <a href="#introduction"><span class="n">1</span>Introduction</a>
-      <a href="#background"><span class="n">2</span>Background</a>
-      <a href="#method"><span class="n">3</span>Method</a>
-      <a href="#experiment"><span class="n">4</span>Experiment</a>
-      <a href="#results"><span class="n">5</span>Results</a>
-      <a href="#conclusion"><span class="n">6</span>Conclusion</a>
+    <nav class="nav" id="nav" aria-label="Sections">
+      <a href="#introduction"><span class="n">1</span><span data-l="en">Introduction</span><span data-l="ja">はじめに</span></a>
+      <a href="#background"><span class="n">2</span><span data-l="en">Background</span><span data-l="ja">関連研究</span></a>
+      <a href="#method"><span class="n">3</span><span data-l="en">Method</span><span data-l="ja">提案手法</span></a>
+      <a href="#experiment"><span class="n">4</span><span data-l="en">Experiment</span><span data-l="ja">実験</span></a>
+      <a href="#results"><span class="n">5</span><span data-l="en">Results</span><span data-l="ja">結果</span></a>
+      <a href="#conclusion"><span class="n">6</span><span data-l="en">Conclusion</span><span data-l="ja">結論</span></a>
     </nav>
+    <div class="lang" role="group" aria-label="Language / 言語">
+      <button type="button" data-setlang="en" aria-pressed="true">EN</button>
+      <button type="button" data-setlang="ja" aria-pressed="false" lang="ja">日本語</button>
+    </div>
   </div>
 </header>
 
 <main id="top">
   <!-- ======================= HERO ======================= -->
-  <div class="hero">
+  <div class="hero" id="hero">
     <div class="wrap">
-      <p class="hero-kind">Graduation research thesis, National Institute of Technology, Tsuyama College</p>
-      <h1>Enhancing Neural Collaborative Filtering by Aggregation with Dual-Side Semantic Review Embeddings</h1>
-      <p class="byline"><b>San Tana</b>, advised by <b>Kanshin Bou</b><br />Department of Integrated Science and Technology, Communication and Information Systems Program<br />January 22, 2026</p>
+      <p class="pill"><i></i><span data-l="en">Graduation research thesis, 2026</span><span data-l="ja">卒業研究論文（2026年）</span></p>
+      <h1>
+        <span data-l="en">Enhancing Neural Collaborative Filtering by Aggregation with Dual-Side Semantic Review Embeddings</span>
+        <span data-l="ja">ユーザとホテル双方のレビュー埋め込みを統合した集約型ニューラル協調フィルタリングの高精度化</span>
+      </h1>
+      <p class="orig" data-l="ja">原題：Enhancing Neural Collaborative Filtering by Aggregation with Dual-Side Semantic Review Embeddings</p>
+      <p class="byline" data-l="en"><b>San Tana</b>, advised by <b>Kanshin Bou</b><br />National Institute of Technology, Tsuyama College<br />Department of Integrated Science and Technology, Communication and Information Systems Program<br />January 22, 2026</p>
+      <p class="byline" data-l="ja">著者 <b>San Tana</b>　指導教員 <b>Kanshin Bou</b><br />津山工業高等専門学校 総合理工学科 情報システム系<br />2026年1月22日</p>
+      <div class="cta">
+        <a class="btn primary" href="#results"><span data-l="en">See the results</span><span data-l="ja">結果を見る</span><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 3v10M3.5 8.5 8 13l4.5-4.5"/></svg></a>
+        <a class="btn ghost" href="#architectures"><span data-l="en">How the model works</span><span data-l="ja">モデルの仕組み</span></a>
+      </div>
 
-      <div class="vec" role="img" aria-label="The proposed model's input vector z0: four 64-dimensional parts — user ID embedding, hotel ID embedding, hotel review embedding, and user review embedding — 256 dimensions in total.">
+      <div class="vec" role="img" aria-label="z0 = user ID + hotel ID + hotel reviews + user reviews, 4 × 64 = 256 dimensions">
         <div class="vec-bar" aria-hidden="true">
           <div class="seg uid"><span class="kx" data-tex="\mathbf{p}_u"></span></div>
           <div class="seg iid"><span class="kx" data-tex="\mathbf{q}_i"></span></div>
@@ -298,18 +423,19 @@
           <div class="seg utx"><span class="kx" data-tex="\mathbf{t}'_u"></span></div>
         </div>
         <div class="vec-labels" aria-hidden="true">
-          <span><b>User ID</b><span class="why">who is rating</span></span>
-          <span><b>Hotel ID</b><span class="why">what is rated</span></span>
-          <span><b>Hotel reviews</b><span class="why">every review the hotel received</span></span>
-          <span><b>User reviews</b><span class="why">everything the user has written</span></span>
+          <span><b><span data-l="en">User ID</span><span data-l="ja">ユーザID</span></b><span class="why"><span data-l="en">who is rating</span><span data-l="ja">評価する人</span></span></span>
+          <span><b><span data-l="en">Hotel ID</span><span data-l="ja">ホテルID</span></b><span class="why"><span data-l="en">what is rated</span><span data-l="ja">評価される対象</span></span></span>
+          <span><b><span data-l="en">Hotel reviews</span><span data-l="ja">ホテルの<wbr>レビュー</span></b><span class="why"><span data-l="en">every review the hotel received</span><span data-l="ja">そのホテルへの全レビュー</span></span></span>
+          <span><b><span data-l="en">User reviews</span><span data-l="ja">ユーザの<wbr>レビュー</span></b><span class="why"><span data-l="en">everything the user has written</span><span data-l="ja">そのユーザが書いた全レビュー</span></span></span>
         </div>
-        <p class="vec-caption">Each part is 64 numbers, so the model reads 256 in total. The two review parts are what this thesis adds to NCF-AG.</p>
+        <p class="vec-caption"><span data-l="en">Each part is 64 numbers, so the model reads 256 in total. The two review parts are what this thesis adds to NCF-AG.</span><span data-l="ja">各要素は64次元で、合計256次元の入力となる。2つのレビュー要素が、本研究で NCF-AG に新たに加えた部分である。</span></p>
       </div>
 
-      <div class="headline">
-        <p><strong>0.8163 RMSE</strong>Best test error, from the proposed Dual-Side model with MPNet embeddings: 4.47% lower than the NCF-AG baseline.</p>
-        <p><strong>User text &gt; hotel text</strong>With MPNet, a user's own reviews improve accuracy about twice as much as the hotel's reviews do.</p>
-        <p><strong>3,029,888 ratings</strong>From 366,058 users on 122,376 hotels (TripAdvisor HotelRec), each with six criteria ratings and review text.</p>
+      <div class="kpis">
+        <div class="kpi"><strong>0.8163</strong><span data-l="en">Test RMSE of the proposed Dual-Side model (MPNet)</span><span data-l="ja">提案手法 Dual-Side（MPNet）のテストRMSE</span></div>
+        <div class="kpi"><strong>−4.47%</strong><span data-l="en">Lower error than the NCF-AG baseline</span><span data-l="ja">ベースライン NCF-AG からの誤差削減率</span></div>
+        <div class="kpi"><strong>2.1×</strong><span data-l="en">Gain from user reviews vs. hotel reviews (MPNet)</span><span data-l="ja">ホテルのレビューに対するユーザのレビューの改善効果（MPNet）</span></div>
+        <div class="kpi"><strong>3.03M</strong><span data-l="en">TripAdvisor ratings with six criteria and review text</span><span data-l="ja">6項目評価とレビュー文を持つ TripAdvisor の評価データ</span></div>
       </div>
     </div>
   </div>
@@ -317,16 +443,28 @@
   <!-- ======================= 1 INTRODUCTION ======================= -->
   <section class="chapter" id="introduction" aria-labelledby="h-intro">
     <div class="wrap">
-      <div class="ch-head"><span class="ch-num">1</span><h2 id="h-intro">Introduction</h2></div>
-      <div class="ch-body prose">
-        <p class="lead">Recommendation systems help people choose from millions of products, videos and hotels. Most learn only from star ratings, and ignore the reviews people take the time to write.</p>
-        <p>A rating says <em>how much</em> someone liked a hotel. The review says <em>why</em>: the quiet room, the rude front desk, the station five minutes away. It also shows who the reviewer is: what they care about, and how strictly they rate.</p>
-        <p>This thesis brings that text into a strong deep-learning recommender, <strong>NCF-AG</strong> (Neural Collaborative Filtering by Aggregation), which already predicts six detailed criteria ratings before the overall score. The work has three parts:</p>
-        <ol>
-          <li>Re-implement NCF-AG as a high-performance baseline.</li>
-          <li>Build hybrid models that add hotel review text, user review text, and both together (the proposed Dual-Side model).</li>
-          <li>Measure how much each kind of text improves rating prediction on a large real-world dataset.</li>
-        </ol>
+      <div class="ch-head"><span class="ch-num">1</span><h2 id="h-intro"><span data-l="en">Introduction</span><span data-l="ja">はじめに</span></h2></div>
+      <div class="intro">
+        <div class="prose">
+          <div data-l="en">
+            <p class="lead">Recommendation systems help people choose from millions of products, videos and hotels. Most learn only from star ratings, and ignore the reviews people take the time to write.</p>
+            <p>A rating says <em>how much</em> someone liked a hotel. The review says <em>why</em>: the quiet room, the rude front desk, the station five minutes away. It also shows who the reviewer is: what they care about, and how strictly they rate.</p>
+            <p>This thesis brings that text into <strong>NCF-AG</strong> (Neural Collaborative Filtering by Aggregation), a strong deep-learning recommender that already predicts six detailed criteria ratings before the overall score.</p>
+          </div>
+          <div data-l="ja">
+            <p class="lead">推薦システムは、膨大な商品・動画・ホテルの中から利用者に合うものを選ぶ手助けをする。しかし多くの手法は星の数による評価値だけから学習し、利用者が書いたレビュー文を活用していない。</p>
+            <p>評価値が示すのは「どれだけ気に入ったか」だけである。レビュー文には「なぜそう感じたか」、例えば静かな部屋、無愛想なフロント、駅から5分の立地などが書かれている。さらに、書き手が何を重視し、どれほど厳しく評価する人なのかも表れる。</p>
+            <p>本研究では、総合評価の前に6項目の詳細な評価を予測する高性能な深層学習推薦モデル <strong>NCF-AG</strong>（Neural Collaborative Filtering by Aggregation）に、レビュー文の情報を取り入れる。</p>
+          </div>
+        </div>
+        <div class="card tasks">
+          <h4><span data-l="en">What this research does</span><span data-l="ja">本研究で行うこと</span></h4>
+          <ol>
+            <li><span data-l="en">Re-implement NCF-AG as a high-performance baseline.</span><span data-l="ja">ベースラインとして NCF-AG を再実装する。</span></li>
+            <li><span data-l="en">Build hybrid models that add hotel review text, user review text, and both together.</span><span data-l="ja">ホテルのレビュー、ユーザのレビュー、その両方を加えたハイブリッドモデルを構築する。</span></li>
+            <li><span data-l="en">Measure how much each kind of text improves rating prediction on a large real-world dataset.</span><span data-l="ja">大規模な実データで、各レビュー情報が評価予測の精度をどれだけ改善するかを検証する。</span></li>
+          </ol>
+        </div>
       </div>
     </div>
   </section>
@@ -334,107 +472,126 @@
   <!-- ======================= 2 BACKGROUND ======================= -->
   <section class="chapter" id="background" aria-labelledby="h-bg">
     <div class="wrap">
-      <div class="ch-head"><span class="ch-num">2</span><h2 id="h-bg">Background</h2></div>
-      <div class="ch-body">
-        <div class="prose">
-          <p>Collaborative filtering assumes that people who agreed in the past will agree again. Each step below keeps that idea but models it with more power. The last one is the baseline this thesis builds on.</p>
-        </div>
-        <ol class="lineage">
-          <li>
-            <h4>Matrix Factorization</h4>
-            <p class="cite">Koren et al., 2009 [6]</p>
-            <p>Users and items become vectors in a shared space; a rating is predicted by their dot product. Simple and fast, but only linear.</p>
-            <div class="eq kx" data-tex="\hat{y}_{ui} = \mathbf{p}_u^{\top}\mathbf{q}_i = \sum_{k=1}^{K} p_{uk}\,q_{ik}" data-display></div>
-          </li>
-          <li>
-            <h4>Neural Collaborative Filtering</h4>
-            <p class="cite">He et al., 2017 [1]</p>
-            <p>Replaces the dot product with a neural network. The MLP variant concatenates the user and item embeddings and learns non-linear interactions through stacked ReLU layers.</p>
-            <div class="eq kx" data-tex="\mathbf{z}_1 = [\,\mathbf{p}_u,\ \mathbf{q}_i\,],\quad \hat{y}_{ui} = \sigma\!\left(\mathbf{h}^{\top}\phi_L(\mathbf{z}_{L-1})\right)" data-display></div>
-          </li>
-          <li>
-            <h4>NCF by Aggregation (NCF-AG)</h4>
-            <p class="cite">Morise et al., 2022 [2]</p>
-            <p>Uses multi-criteria ratings. Stage 1 predicts each criterion (service, location, …); stage 2 aggregates them into the overall rating, much like a person forming an overall opinion.</p>
-            <div class="eq kx" data-tex="\hat{R}^{1}_{ui} = a_{out}\!\left(\mathbf{h}^{\top}[\hat{R}^{l}_{ui}]\right),\ l = 2,\dots,L" data-display></div>
-          </li>
-        </ol>
-        <p class="note" style="margin-top:14px">All three use only IDs and numbers. None of them reads the review text.</p>
+      <div class="ch-head"><span class="ch-num">2</span><h2 id="h-bg"><span data-l="en">Background</span><span data-l="ja">関連研究</span></h2></div>
+      <div class="prose">
+        <p data-l="en">Collaborative filtering assumes that people who agreed in the past will agree again. Each step below keeps that idea but models it with more power. The last one is the baseline this thesis builds on.</p>
+        <p data-l="ja">協調フィルタリングは「過去に好みが一致した人は、今後も一致する」という考えに基づく。以下の手法はこの考えを保ちながら、より表現力の高いモデルへと発展してきた。最後の NCF-AG が本研究のベースラインである。</p>
       </div>
+      <ol class="lineage">
+        <li class="card">
+          <h4><span data-l="en">Matrix Factorization</span><span data-l="ja">行列因子分解（MF）</span></h4>
+          <p class="cite">Koren et al., 2009 [6]</p>
+          <p data-l="en">Users and items become vectors in a shared space, and a rating is predicted by their dot product. Simple and fast, but only linear.</p>
+          <p data-l="ja">ユーザとアイテムを同じ潜在空間のベクトルで表し、その内積で評価値を予測する。単純で高速だが、線形な関係しか表現できない。</p>
+          <div class="eq kx" data-tex="\hat{y}_{ui} = \mathbf{p}_u^{\top}\mathbf{q}_i = \sum_{k=1}^{K} p_{uk}\,q_{ik}" data-display></div>
+        </li>
+        <li class="card">
+          <h4><span data-l="en">Neural Collaborative Filtering</span><span data-l="ja">ニューラル協調フィルタリング（NCF）</span></h4>
+          <p class="cite">He et al., 2017 [1]</p>
+          <p data-l="en">Replaces the dot product with a neural network. The MLP variant concatenates the user and item embeddings and learns non-linear interactions through stacked ReLU layers.</p>
+          <p data-l="ja">内積の代わりにニューラルネットワークを用いる。MLP 版ではユーザとアイテムの埋め込みを連結し、ReLU 層を重ねて非線形な相互作用を学習する。</p>
+          <div class="eq kx" data-tex="\mathbf{z}_1 = [\,\mathbf{p}_u,\ \mathbf{q}_i\,],\quad \hat{y}_{ui} = \sigma\!\left(\mathbf{h}^{\top}\phi_L(\mathbf{z}_{L-1})\right)" data-display></div>
+        </li>
+        <li class="card is-base">
+          <span class="tag"><span data-l="en">Baseline in this thesis</span><span data-l="ja">本研究のベースライン</span></span>
+          <h4><span data-l="en">NCF by Aggregation (NCF-AG)</span><span data-l="ja">集約型 NCF（NCF-AG）</span></h4>
+          <p class="cite">Morise et al., 2022 [2]</p>
+          <p data-l="en">Uses multi-criteria ratings. Stage 1 predicts each criterion (service, location, …); stage 2 aggregates them into the overall rating, much like a person forming an overall opinion.</p>
+          <p data-l="ja">多基準評価を利用する。第1段階で各項目（サービス、立地など）の評価を予測し、第2段階でそれらを集約して総合評価を出す。人が全体の印象を決める過程に近い構造である。</p>
+          <div class="eq kx" data-tex="\hat{R}^{1}_{ui} = a_{out}\!\left(\mathbf{h}^{\top}[\hat{R}^{l}_{ui}]\right),\ l = 2,\dots,L" data-display></div>
+        </li>
+      </ol>
+      <p class="note" style="margin-top:16px"><span data-l="en">All three use only IDs and numbers. None of them reads the review text.</span><span data-l="ja">いずれの手法も ID と数値の評価しか使わず、レビュー文は読んでいない。</span></p>
     </div>
   </section>
 
   <!-- ======================= 3 METHOD ======================= -->
   <section class="chapter" id="method" aria-labelledby="h-method">
     <div class="wrap">
-      <div class="ch-head"><span class="ch-num">3</span><h2 id="h-method">Method</h2></div>
-      <div class="ch-body">
-        <h3>3.1 Data: from 50 million reviews to a dense core</h3>
-        <div class="prose">
-          <p>The raw <strong>HotelRec</strong> dataset [3] is a single 40 GB JSON file of about 50 million TripAdvisor hotel reviews. Each review has user and hotel IDs, an overall rating (1–5), six criteria ratings, and the review text.</p>
-          <ul class="criteria" aria-label="The six criteria">
-            <li>Service</li><li>Cleanliness</li><li>Value</li><li>Sleep quality</li><li>Rooms</li><li>Location</li>
-          </ul>
-        </div>
-        <ol class="pipeline">
-          <li><b>Stream the file</b><span>Read one review at a time so the 40 GB file never has to fit in memory; drop reviews with invalid user IDs (null, undefined).</span></li>
-          <li><b>Remove rare users and hotels</b><span>Keep only users and hotels with at least 5 interactions in the whole dataset.</span></li>
-          <li><b>Keep complete reviews</b><span>Keep only reviews that have review text and all six criteria ratings.</span></li>
-          <li><b>5-core decomposition</b><span>Repeatedly remove any user or hotel with fewer than 5 remaining interactions, until every user has rated at least 5 hotels and every hotel has at least 5 reviews.</span></li>
-          <li><b>Map IDs to integers</b><span>Turn string IDs into continuous indices for the embedding layers.</span></li>
-          <li><b>Build semantic profiles</b><span>For every hotel, join all its reviews into one document; for every user, join all reviews they wrote. Encode each with a Sentence Transformer [4]: <em>all-MiniLM-L6-v2</em> (384 dimensions, fast) or <em>all-mpnet-base-v2</em> [5] (768 dimensions, more accurate).</span></li>
+      <div class="ch-head"><span class="ch-num">3</span><h2 id="h-method"><span data-l="en">Method</span><span data-l="ja">提案手法</span></h2></div>
+
+      <h3 style="margin-top:0"><span data-l="en">3.1 Data: from 50 million reviews to a dense core</span><span data-l="ja">3.1 データ：約5,000万件のレビューから密なデータへ</span></h3>
+      <div class="prose">
+        <p data-l="en">The raw <strong>HotelRec</strong> dataset [3] is a single 40 GB JSON file of about 50 million TripAdvisor hotel reviews. Each review has user and hotel IDs, an overall rating (1–5), six criteria ratings, and the review text.</p>
+        <p data-l="ja">元データの <strong>HotelRec</strong> [3] は、TripAdvisor のホテルレビュー約5,000万件を含む 40 GB の単一 JSON ファイルである。各レビューは、ユーザID・ホテルID・総合評価（1〜5）・6項目の評価・レビュー文を持つ。</p>
+        <ul class="criteria" aria-label="Criteria">
+          <li><span data-l="en">Service</span><span data-l="ja">サービス</span></li>
+          <li><span data-l="en">Cleanliness</span><span data-l="ja">清潔さ</span></li>
+          <li><span data-l="en">Value</span><span data-l="ja">価値（Value）</span></li>
+          <li><span data-l="en">Sleep quality</span><span data-l="ja">睡眠の質</span></li>
+          <li><span data-l="en">Rooms</span><span data-l="ja">客室</span></li>
+          <li><span data-l="en">Location</span><span data-l="ja">立地</span></li>
+        </ul>
+      </div>
+
+      <div class="data-grid" style="margin-top:24px">
+        <ol class="card pipeline">
+          <li><b><span data-l="en">Stream the file</span><span data-l="ja">ファイルを逐次読み込み</span></b><span data-l="en">Read one review at a time so the 40 GB file never has to fit in memory; drop reviews with invalid user IDs (null, undefined).</span><span data-l="ja">40 GB のファイルを1件ずつ読み込み、全体をメモリに載せずに処理する。不正なユーザID（null、undefined）のレビューは除外する。</span></li>
+          <li><b><span data-l="en">Remove rare users and hotels</span><span data-l="ja">評価の少ないユーザ・ホテルを除外</span></b><span data-l="en">Keep only users and hotels with at least 5 interactions in the whole dataset.</span><span data-l="ja">データ全体で5件以上の評価があるユーザとホテルのみを残す。</span></li>
+          <li><b><span data-l="en">Keep complete reviews</span><span data-l="ja">完全なレビューのみ保持</span></b><span data-l="en">Keep only reviews that have review text and all six criteria ratings.</span><span data-l="ja">レビュー文と6項目すべての評価を持つレビューのみを残す。</span></li>
+          <li><b><span data-l="en">5-core decomposition</span><span data-l="ja">5-core 分解</span></b><span data-l="en">Repeatedly remove any user or hotel with fewer than 5 remaining interactions, until every user has rated at least 5 hotels and every hotel has at least 5 reviews.</span><span data-l="ja">残りの評価数が5未満のユーザ・ホテルを繰り返し除外し、全ユーザが5軒以上を評価し、全ホテルが5件以上のレビューを持つ状態にする。</span></li>
+          <li><b><span data-l="en">Map IDs to integers</span><span data-l="ja">ID を整数に変換</span></b><span data-l="en">Turn string IDs into continuous indices for the embedding layers.</span><span data-l="ja">文字列の ID を、埋め込み層で使える連続した整数インデックスに変換する。</span></li>
+          <li><b><span data-l="en">Build semantic profiles</span><span data-l="ja">意味プロファイルの作成</span></b><span data-l="en">For every hotel, join all its reviews into one document; for every user, join all reviews they wrote. Encode each with a Sentence Transformer [4]: <em>all-MiniLM-L6-v2</em> (384 dimensions, fast) or <em>all-mpnet-base-v2</em> [5] (768 dimensions, more accurate).</span><span data-l="ja">ホテルごとに全レビューを1つの文書にまとめ、ユーザごとに書いた全レビューをまとめる。それぞれを Sentence Transformer [4] で符号化する：<em>all-MiniLM-L6-v2</em>（384次元、高速）または <em>all-mpnet-base-v2</em> [5]（768次元、高精度）。</span></li>
         </ol>
+        <div class="card">
+          <dl class="stats" aria-label="Table 1">
+            <div><dt><span data-l="en">Users</span><span data-l="ja">ユーザ数</span></dt><dd>366,058</dd></div>
+            <div><dt><span data-l="en">Hotels</span><span data-l="ja">ホテル数</span></dt><dd>122,376</dd></div>
+            <div><dt><span data-l="en">Ratings</span><span data-l="ja">評価数</span></dt><dd>3,029,888</dd></div>
+            <div><dt><span data-l="en">Criteria</span><span data-l="ja">評価項目数</span></dt><dd>6</dd></div>
+            <div><dt><span data-l="en">Sparsity</span><span data-l="ja">スパース性</span></dt><dd>99.99%</dd></div>
+          </dl>
+          <p class="note stats-cap"><span data-l="en">Table 1. The final dataset: about 25 ratings per hotel, and extremely sparse, as real recommendation data usually is. The 5-core filter and NCF-AG's multi-task learning (7 ratings per review) help with that.</span><span data-l="ja">表1：最終的なデータセット。ホテルあたり平均約25件の評価があるが、実際の推薦データによくあるように極めてスパースである。5-core フィルタと、レビュー1件から7つの評価を学習する NCF-AG のマルチタスク学習がこれを補う。</span></p>
+        </div>
+      </div>
 
-        <dl class="stats" aria-label="Final dataset statistics (Table 1)">
-          <div><dt>Users</dt><dd>366,058</dd></div>
-          <div><dt>Hotels</dt><dd>122,376</dd></div>
-          <div><dt>Ratings</dt><dd>3,029,888</dd></div>
-          <div><dt>Criteria</dt><dd>6</dd></div>
-          <div><dt>Sparsity</dt><dd>99.99%</dd></div>
-        </dl>
-        <p class="note prose">Table 1. Final filtered dataset. About 25 ratings per hotel; extremely sparse, as real recommendation data usually is. The 5-core filter and NCF-AG's multi-task learning (7 ratings per review) help with that.</p>
+      <h3 id="architectures"><span data-l="en">3.2 Four architectures, one backbone</span><span data-l="ja">3.2 共通の骨格をもつ4つのモデル</span></h3>
+      <div class="prose">
+        <p data-l="en">All four models share the same NCF-AG backbone: an MLP tower, six criteria heads and an aggregation layer. They differ only in what goes into the first layer. Text embeddings (384 or 768 numbers) would drown out the 64-number ID embeddings, so each is first compressed to 64 by a learned projection.</p>
+        <p data-l="ja">4つのモデルはすべて同じ NCF-AG の骨格（MLP、6項目の予測ヘッド、集約層）を共有し、最初の層への入力だけが異なる。テキスト埋め込み（384 または 768 次元）をそのまま連結すると 64 次元の ID 埋め込みが埋もれてしまうため、学習可能な射影層で 64 次元に圧縮する。</p>
+      </div>
 
-        <h3 id="architectures">3.2 Four architectures, one backbone</h3>
-        <div class="prose">
-          <p>All four models share the same NCF-AG backbone: an MLP tower, six criteria heads and an aggregation layer. They differ only in what goes into the first layer. Text embeddings (384 or 768 numbers) would drown out the 64-number ID embeddings, so each one is first compressed to 64 by a learned projection.</p>
+      <div class="seg-ctl" role="tablist" aria-label="Architecture">
+        <button role="tab" id="tab-base" aria-controls="arch-panel" aria-selected="false" data-arch="base"><span class="swatch" style="background:var(--c-base)"></span><span data-l="en">Baseline<span class="long">&nbsp;NCF-AG</span></span><span data-l="ja">ベースライン</span></button>
+        <button role="tab" id="tab-item" aria-controls="arch-panel" aria-selected="false" data-arch="item"><span class="swatch" style="background:var(--c-item)"></span>Item-Text</button>
+        <button role="tab" id="tab-user" aria-controls="arch-panel" aria-selected="false" data-arch="user"><span class="swatch" style="background:var(--c-user)"></span>User-Text</button>
+        <button role="tab" id="tab-dual" aria-controls="arch-panel" aria-selected="true" data-arch="dual"><span class="swatch" style="background:var(--c-dual)"></span>Dual-Side<span class="long">&nbsp;<span data-l="en">(proposed)</span><span data-l="ja">（提案）</span></span></button>
+      </div>
+
+      <div class="arch" id="arch-panel" role="tabpanel" aria-labelledby="tab-dual">
+        <div class="card diagram" aria-hidden="true">
+          <div class="inputs">
+            <div class="in uid" data-part="uid"><b><span data-l="en">User ID</span><span data-l="ja">ユーザID</span></b><span data-l="en">Embedding</span><span data-l="ja">埋め込み</span><span class="flow">→ 64</span></div>
+            <div class="in iid" data-part="iid"><b><span data-l="en">Hotel ID</span><span data-l="ja">ホテルID</span></b><span data-l="en">Embedding</span><span data-l="ja">埋め込み</span><span class="flow">→ 64</span></div>
+            <div class="in itx" data-part="itx"><b><span data-l="en">Hotel reviews</span><span data-l="ja">ホテルの<wbr>レビュー</span></b>MPNet / MiniLM<span class="flow">768 / 384 → 64</span></div>
+            <div class="in utx" data-part="utx"><b><span data-l="en">User reviews</span><span data-l="ja">ユーザの<wbr>レビュー</span></b>MPNet / MiniLM<span class="flow">768 / 384 → 64</span></div>
+          </div>
+          <div class="arrow"></div>
+          <div class="zbar"><span class="uid" data-part="uid"></span><span class="iid" data-part="iid"></span><span class="itx" data-part="itx"></span><span class="utx" data-part="utx"></span></div>
+          <div class="zlabel"><span><span data-l="en">Concatenated input</span><span data-l="ja">連結した入力</span> <span class="kx" data-tex="\mathbf{z}_0"></span></span><b id="zdim">256</b></div>
+          <div class="arrow"></div>
+          <div class="mlp">
+            <div class="layer"><b><span data-l="en">Hidden layer 1</span><span data-l="ja">隠れ層 1</span></b><span><span data-l="en">256 units, ReLU, dropout 0.5</span><span data-l="ja">256、ReLU、ドロップアウト 0.5</span></span></div>
+            <div class="layer"><b><span data-l="en">Hidden layer 2</span><span data-l="ja">隠れ層 2</span></b><span><span data-l="en">128 units, ReLU</span><span data-l="ja">128、ReLU</span></span></div>
+            <div class="layer"><b><span data-l="en">Hidden layer 3</span><span data-l="ja">隠れ層 3</span></b><span><span data-l="en">64 units, ReLU</span><span data-l="ja">64、ReLU</span></span></div>
+          </div>
+          <div class="arrow"></div>
+          <div class="heads">
+            <span><span data-l="en">Service</span><span data-l="ja">サービス</span></span><span><span data-l="en">Cleanliness</span><span data-l="ja">清潔さ</span></span><span><span data-l="en">Value</span><span data-l="ja">価値</span></span><span><span data-l="en">Sleep quality</span><span data-l="ja">睡眠の質</span></span><span><span data-l="en">Rooms</span><span data-l="ja">客室</span></span><span><span data-l="en">Location</span><span data-l="ja">立地</span></span>
+          </div>
+          <div class="arrow"></div>
+          <div class="out" id="archOut"><span data-l="en">Aggregation → overall rating</span><span data-l="ja">集約 → 総合評価</span></div>
         </div>
 
-        <div class="tabs" role="tablist" aria-label="Choose an architecture">
-          <button role="tab" id="tab-base" aria-controls="arch-panel" aria-selected="false" data-arch="base"><span class="swatch" style="background:var(--c-base)"></span>Baseline<span class="long">&nbsp;NCF-AG</span></button>
-          <button role="tab" id="tab-item" aria-controls="arch-panel" aria-selected="false" data-arch="item"><span class="swatch" style="background:var(--c-item)"></span>Item-Text</button>
-          <button role="tab" id="tab-user" aria-controls="arch-panel" aria-selected="false" data-arch="user"><span class="swatch" style="background:var(--c-user)"></span>User-Text</button>
-          <button role="tab" id="tab-dual" aria-controls="arch-panel" aria-selected="true" data-arch="dual"><span class="swatch" style="background:var(--c-dual)"></span>Dual-Side<span class="long">&nbsp;(proposed)</span></button>
-        </div>
-
-        <div class="arch" id="arch-panel" role="tabpanel" aria-labelledby="tab-dual">
-          <div class="diagram" aria-hidden="true">
-            <div class="inputs">
-              <div class="in uid" data-part="uid"><b>User ID</b>Embedding<span class="flow">→ 64</span></div>
-              <div class="in iid" data-part="iid"><b>Hotel ID</b>Embedding<span class="flow">→ 64</span></div>
-              <div class="in itx" data-part="itx"><b>Hotel reviews</b>MPNet / MiniLM<span class="flow">768 / 384 → 64</span></div>
-              <div class="in utx" data-part="utx"><b>User reviews</b>MPNet / MiniLM<span class="flow">768 / 384 → 64</span></div>
-            </div>
-            <div class="arrow"></div>
-            <div class="zbar"><span class="uid" data-part="uid"></span><span class="iid" data-part="iid"></span><span class="itx" data-part="itx"></span><span class="utx" data-part="utx"></span></div>
-            <div class="zlabel"><span>Concatenated input <span class="kx" data-tex="\mathbf{z}_0"></span></span><b id="zdim">256</b></div>
-            <div class="arrow"></div>
-            <div class="mlp">
-              <div class="layer"><b>Hidden layer 1</b><span>256 units, ReLU, dropout 0.5</span></div>
-              <div class="layer"><b>Hidden layer 2</b><span>128 units, ReLU</span></div>
-              <div class="layer"><b>Hidden layer 3</b><span>64 units, ReLU</span></div>
-            </div>
-            <div class="arrow"></div>
-            <div class="heads"><span>Service</span><span>Cleanliness</span><span>Value</span><span>Sleep quality</span><span>Rooms</span><span>Location</span></div>
-            <div class="arrow"></div>
-            <div class="out" id="archOut">Aggregation → overall rating</div>
+        <div class="card arch-text" aria-live="polite">
+          <h4 id="archName"></h4>
+          <p class="dims" id="archDims"></p>
+          <p id="archDesc"></p>
+          <div class="arch-rmse">
+            <div><span><span data-l="en">Test RMSE, MPNet</span><span data-l="ja">テストRMSE（MPNet）</span></span><b id="archMp"></b></div>
+            <div><span><span data-l="en">Test RMSE, MiniLM</span><span data-l="ja">テストRMSE（MiniLM）</span></span><b id="archMl"></b></div>
           </div>
-
-          <div class="arch-text" aria-live="polite">
-            <h4 id="archName"></h4>
-            <p class="dims" id="archDims"></p>
-            <p id="archDesc"></p>
-            <div class="eqblock" id="archEq"></div>
-          </div>
+          <div class="eqblock" id="archEq"></div>
         </div>
       </div>
     </div>
@@ -443,28 +600,32 @@
   <!-- ======================= 4 EXPERIMENT ======================= -->
   <section class="chapter" id="experiment" aria-labelledby="h-exp">
     <div class="wrap">
-      <div class="ch-head"><span class="ch-num">4</span><h2 id="h-exp">Experiment</h2></div>
-      <div class="ch-body">
-        <div class="prose">
-          <p>Every deep model used the same settings and the same saved data split, so any difference in results comes from the input, not the training.</p>
+      <div class="ch-head"><span class="ch-num">4</span><h2 id="h-exp"><span data-l="en">Experiment</span><span data-l="ja">実験</span></h2></div>
+      <div class="prose">
+        <p data-l="en">Every deep model used the same settings and the same saved data split, so any difference in results comes from the input, not the training.</p>
+        <p data-l="ja">すべての深層学習モデルで同じ設定と同じデータ分割を用いた。そのため結果の差は学習条件ではなく、入力の違いによるものである。</p>
+      </div>
+      <div class="exp-grid" style="margin-top:20px">
+        <div class="card">
+          <dl class="spec">
+            <dt><span data-l="en">Data split</span><span data-l="ja">データ分割</span></dt><dd><span data-l="en">70% train, 10% validation, 20% test, with a fixed random seed</span><span data-l="ja">学習 70%、検証 10%、テスト 20%（乱数シード固定）</span></dd>
+            <dt><span data-l="en">Embeddings</span><span data-l="ja">埋め込み</span></dt><dd><span data-l="en">64 dimensions for user and hotel IDs and for projected text</span><span data-l="ja">ユーザ・ホテルID、射影後のテキストともに 64 次元</span></dd>
+            <dt><span data-l="en">MLP tower</span><span data-l="ja">MLP</span></dt><dd><span data-l="en">256 → 128 → 64, ReLU, dropout 0.5</span><span data-l="ja">256 → 128 → 64、ReLU、ドロップアウト 0.5</span></dd>
+            <dt><span data-l="en">Optimizer</span><span data-l="ja">最適化手法</span></dt><dd><span data-l="en">AdamW, learning rate 0.0005, weight decay 0.0001</span><span data-l="ja">AdamW（学習率 0.0005、重み減衰 0.0001）</span></dd>
+            <dt><span data-l="en">Batch size</span><span data-l="ja">バッチサイズ</span></dt><dd>1,024</dd>
+            <dt><span data-l="en">Stopping</span><span data-l="ja">学習の終了</span></dt><dd><span data-l="en">Early stopping at the lowest validation RMSE</span><span data-l="ja">検証RMSEが最小となる時点で早期終了</span></dd>
+            <dt><span data-l="en">Framework</span><span data-l="ja">フレームワーク</span></dt><dd>PyTorch</dd>
+            <dt><span data-l="en">Baselines</span><span data-l="ja">比較手法</span></dt><dd><span data-l="en">Matrix Factorization (64-dim, dot product) and NCF-AG (same MLP, IDs only)</span><span data-l="ja">行列因子分解（64次元、内積）と NCF-AG（同じ MLP、ID のみ）</span></dd>
+          </dl>
         </div>
-        <dl class="spec">
-          <dt>Data split</dt><dd>70% train, 10% validation, 20% test, with a fixed random seed</dd>
-          <dt>Embeddings</dt><dd>64 dimensions for user and hotel IDs and for projected text</dd>
-          <dt>MLP tower</dt><dd>256 → 128 → 64, ReLU, dropout 0.5</dd>
-          <dt>Optimizer</dt><dd>AdamW, learning rate 0.0005, weight decay 0.0001</dd>
-          <dt>Batch size</dt><dd>1,024</dd>
-          <dt>Stopping</dt><dd>Early stopping at the lowest validation RMSE</dd>
-          <dt>Framework</dt><dd>PyTorch</dd>
-          <dt>Baselines</dt><dd>Matrix Factorization (64-dim, dot product) and NCF-AG (same MLP, IDs only)</dd>
-        </dl>
-
-        <h3>Training objective and metric</h3>
-        <div class="prose"><p>The models learn the overall rating and the six criteria at the same time. Results are reported as RMSE on the test set, in stars; lower is better.</p></div>
-        <div class="eqs">
-          <div class="eqrow"><span class="kx" data-tex="\mathcal{L} = \mathcal{L}_{overall} + \alpha \sum_{k=1}^{6} \mathcal{L}^{(k)}_{criteria}" data-display></span><small>(12) loss</small></div>
-          <div class="eqrow"><span class="kx" data-tex="\mathcal{L}_{overall} = \frac{1}{N}\sum \left(\hat{R}^{1}_{ui} - R^{1}_{ui}\right)^2" data-display></span><small>(13) MSE</small></div>
-          <div class="eqrow"><span class="kx" data-tex="\mathrm{RMSE} = \sqrt{\frac{1}{N}\sum_{i=1}^{N}\left(R_{ui} - \hat{R}_{ui}\right)^2}" data-display></span><small>(14) metric</small></div>
+        <div class="exp-side">
+          <h4><span data-l="en">Training objective and metric</span><span data-l="ja">損失関数と評価指標</span></h4>
+          <p><span data-l="en">The models learn the overall rating and the six criteria at the same time. Results are reported as RMSE on the test set, in stars; lower is better.</span><span data-l="ja">モデルは総合評価と6項目の評価を同時に学習する。結果はテストデータに対する RMSE（単位は星）で示し、値が小さいほど良い。</span></p>
+          <div class="eqs">
+            <div class="card eqrow"><span class="kx" data-tex="\mathcal{L} = \mathcal{L}_{overall} + \alpha \sum_{k=1}^{6} \mathcal{L}^{(k)}_{criteria}" data-display></span><small>(12) <span data-l="en">loss</span><span data-l="ja">損失</span></small></div>
+            <div class="card eqrow"><span class="kx" data-tex="\mathcal{L}_{overall} = \frac{1}{N}\sum \left(\hat{R}^{1}_{ui} - R^{1}_{ui}\right)^2" data-display></span><small>(13) MSE</small></div>
+            <div class="card eqrow"><span class="kx" data-tex="\mathrm{RMSE} = \sqrt{\frac{1}{N}\sum_{i=1}^{N}\left(R_{ui} - \hat{R}_{ui}\right)^2}" data-display></span><small>(14) <span data-l="en">metric</span><span data-l="ja">評価指標</span></small></div>
+          </div>
         </div>
       </div>
     </div>
@@ -473,88 +634,102 @@
   <!-- ======================= 5 RESULTS ======================= -->
   <section class="chapter" id="results" aria-labelledby="h-res">
     <div class="wrap">
-      <div class="ch-head"><span class="ch-num">5</span><h2 id="h-res">Results</h2></div>
-      <div class="ch-body">
-        <div class="prose">
-          <p class="lead">Every kind of review text helps, and the order is the same for both embedding models: hotel text a little, user text more, both together the most.</p>
-        </div>
+      <div class="ch-head"><span class="ch-num">5</span><h2 id="h-res"><span data-l="en">Results</span><span data-l="ja">結果</span></h2></div>
+      <div class="prose">
+        <p class="lead" data-l="en">Every kind of review text helps, and the order is the same for both embedding models: hotel text a little, user text more, both together the most.</p>
+        <p class="lead" data-l="ja">どのレビュー情報も精度を改善し、その順序は両方の埋め込みモデルで共通である。ホテルのレビューは少し、ユーザのレビューはより大きく、両方を合わせると最も大きく改善する。</p>
+      </div>
 
-        <div class="panel" style="margin-top:24px">
-          <div class="panel-head">
-            <h4 id="rmseTitle">Test RMSE by architecture (lower is better)</h4>
-            <div class="tabs three" role="tablist" aria-label="Embedding model">
-              <button role="tab" aria-selected="true" data-emb="both">Both</button>
-              <button role="tab" aria-selected="false" data-emb="mpnet">MPNet<span class="long">&nbsp;(768)</span></button>
-              <button role="tab" aria-selected="false" data-emb="minilm">MiniLM<span class="long">&nbsp;(384)</span></button>
-            </div>
-          </div>
-          <div class="chart-box"><canvas id="rmseChart" role="img" aria-labelledby="rmseTitle"></canvas></div>
-          <div class="legend" id="rmseLegend"></div>
-          <p class="note" style="margin:10px 0 0">The axis starts at 0.80 to make the differences visible. Matrix Factorization (2.0657) is far off this scale and is shown in the table.</p>
-        </div>
-
-        <div class="grid-2">
-          <div class="panel">
-            <table class="rt">
-              <caption>Table 2. Final test RMSE</caption>
-              <thead><tr><th scope="col">Model</th><th scope="col">MiniLM</th><th scope="col">MPNet</th></tr></thead>
-              <tbody>
-                <tr><td class="m"><span class="swatch" style="background:var(--c-mf)"></span>Matrix Factorization</td><td colspan="2" style="text-align:center">2.0657 <span class="na">(no text)</span></td></tr>
-                <tr><td class="m"><span class="swatch" style="background:var(--c-base)"></span>Baseline NCF-AG</td><td>0.8441</td><td>0.8545</td></tr>
-                <tr><td class="m"><span class="swatch" style="background:var(--c-item)"></span>Item-Text hybrid</td><td>0.8362</td><td>0.8402</td></tr>
-                <tr><td class="m"><span class="swatch" style="background:var(--c-user)"></span>User-Text hybrid</td><td>0.8303</td><td>0.8245</td></tr>
-                <tr class="best"><td class="m"><span class="swatch" style="background:var(--c-dual)"></span>Dual-Side (proposed)</td><td>0.8258</td><td>0.8163</td></tr>
-              </tbody>
-            </table>
-            <p class="note" style="margin:12px 0 0">Results from a single optimized training run with a fixed random seed.</p>
-          </div>
-          <div class="panel">
-            <div class="panel-head"><h4 id="gainTitle">Improvement over NCF-AG</h4></div>
-            <div class="chart-box" style="height:260px"><canvas id="gainChart" role="img" aria-labelledby="gainTitle"></canvas></div>
-            <p class="note" style="margin:10px 0 0">Relative RMSE reduction, (baseline − model) ÷ baseline, computed from Table 2 for each embedding model.</p>
+      <div class="card panel" style="margin-top:24px">
+        <div class="panel-head">
+          <h4 id="rmseTitle"><span data-l="en">Test RMSE by architecture (lower is better)</span><span data-l="ja">モデル別のテストRMSE（小さいほど良い）</span></h4>
+          <div class="seg-ctl three" role="tablist" aria-label="Embedding model">
+            <button role="tab" aria-selected="true" data-emb="both"><span data-l="en">Both</span><span data-l="ja">両方</span></button>
+            <button role="tab" aria-selected="false" data-emb="mpnet">MPNet<span class="long">&nbsp;(768)</span></button>
+            <button role="tab" aria-selected="false" data-emb="minilm">MiniLM<span class="long">&nbsp;(384)</span></button>
           </div>
         </div>
+        <div class="chart-box"><canvas id="rmseChart" role="img" aria-labelledby="rmseTitle"></canvas></div>
+        <div class="legend" id="rmseLegend"></div>
+        <p class="note" style="margin:10px 0 0"><span data-l="en">The axis starts at 0.80 to make the differences visible. Matrix Factorization (2.0657) is far off this scale and is shown in the table.</span><span data-l="ja">差を見やすくするため、縦軸は 0.80 から始まる。行列因子分解（2.0657）はこの範囲外のため表に記載している。</span></p>
+      </div>
 
-        <ul class="findings">
-          <li style="--fc:var(--c-user)"><div><b>Who the user is matters more than what the hotel is</b><p>With MPNet, user review text alone cut RMSE by 3.51%, about twice the 1.67% from hotel review text. A user's past writing carries a "rating persona": what they care about (a station nearby, good food, a quiet view) and how strictly they rate.</p></div></li>
-          <li style="--fc:var(--c-dual)"><div><b>Fusing both sides works best</b><p>The Dual-Side model was the most accurate with both embedding models: 0.8163 with MPNet (−4.47%) and 0.8258 with MiniLM (−2.17%).</p></div></li>
-          <li style="--fc:var(--c-uid)"><div><b>A size and accuracy trade-off</b><p>MPNet (768 dimensions) gives the best accuracy. MiniLM (384) is close behind with half-size vectors, less memory and faster training. MPNet suits large booking platforms, and MiniLM suits real-time or mobile systems.</p></div></li>
-        </ul>
-
-        <h3>How the models trained</h3>
-        <div class="prose"><p>Validation RMSE fell fastest and lowest for the Dual-Side model. After about 12 epochs the error started to rise again (overfitting), so early stopping kept the best checkpoint.</p></div>
-        <div class="figpair">
-          <figure>
-            <div class="fig"><img src="assets/fig5-learning-minilm.png" width="710" height="468" loading="lazy" alt="Validation RMSE per epoch with MiniLM embeddings for the four NCF-AG models. The Dual-Side model reaches the lowest error, about 0.825 near epoch 11." /></div>
-            <figcaption><b>MiniLM (384-dim).</b> Validation RMSE per epoch.</figcaption>
-          </figure>
-          <figure>
-            <div class="fig"><img src="assets/fig5-learning-mpnet.png" width="665" height="468" loading="lazy" alt="Validation RMSE per epoch with MPNet embeddings. The Dual-Side model reaches the lowest error, about 0.816 near epochs 10 and 11, below User-Hybrid, Item-Hybrid and the NCF-AG baseline." /></div>
-            <figcaption><b>MPNet (768-dim).</b> Validation RMSE per epoch. Figure 5 in the thesis.</figcaption>
-          </figure>
+      <div class="grid-2">
+        <div class="card panel">
+          <table class="rt">
+            <caption><span data-l="en">Table 2. Final test RMSE</span><span data-l="ja">表2：最終的なテストRMSE</span></caption>
+            <thead><tr><th scope="col"><span data-l="en">Model</span><span data-l="ja">モデル</span></th><th scope="col">MiniLM</th><th scope="col">MPNet</th></tr></thead>
+            <tbody>
+              <tr><td class="m"><span class="swatch" style="background:var(--c-mf)"></span><span data-l="en">Matrix Factorization</span><span data-l="ja">行列因子分解</span></td><td colspan="2" style="text-align:center">2.0657 <span class="na"><span data-l="en">(no text)</span><span data-l="ja">（テキストなし）</span></span></td></tr>
+              <tr><td class="m"><span class="swatch" style="background:var(--c-base)"></span><span data-l="en">Baseline NCF-AG</span><span data-l="ja">ベースライン NCF-AG</span></td><td>0.8441</td><td>0.8545</td></tr>
+              <tr><td class="m"><span class="swatch" style="background:var(--c-item)"></span><span data-l="en">Item-Text hybrid</span><span data-l="ja">Item-Text ハイブリッド</span></td><td>0.8362</td><td>0.8402</td></tr>
+              <tr><td class="m"><span class="swatch" style="background:var(--c-user)"></span><span data-l="en">User-Text hybrid</span><span data-l="ja">User-Text ハイブリッド</span></td><td>0.8303</td><td>0.8245</td></tr>
+              <tr class="best"><td class="m"><span class="swatch" style="background:var(--c-dual)"></span><span data-l="en">Dual-Side (proposed)</span><span data-l="ja">Dual-Side（提案）</span></td><td>0.8258</td><td>0.8163</td></tr>
+            </tbody>
+          </table>
+          <p class="note" style="margin:12px 0 0"><span data-l="en">Results from a single optimized training run with a fixed random seed.</span><span data-l="ja">乱数シードを固定した1回の最適化済み学習の結果。</span></p>
         </div>
+        <div class="card panel">
+          <div class="panel-head"><h4 id="gainTitle"><span data-l="en">Improvement over NCF-AG</span><span data-l="ja">NCF-AG からの改善率</span></h4></div>
+          <div class="chart-box" style="height:260px"><canvas id="gainChart" role="img" aria-labelledby="gainTitle"></canvas></div>
+          <p class="note" style="margin:10px 0 0"><span data-l="en">Relative RMSE reduction, (baseline − model) ÷ baseline, computed from Table 2 for each embedding model.</span><span data-l="ja">RMSE の相対削減率 =（ベースライン − モデル）÷ ベースライン。表2の値から埋め込みモデルごとに算出。</span></p>
+        </div>
+      </div>
 
-        <h3>Improvement across all six criteria</h3>
-        <div class="grid-2" style="margin-top:0">
-          <figure>
-            <div class="fig"><img src="assets/fig8-criteria-radar.jpg" width="961" height="436" loading="lazy" alt="Radar chart of RMSE for each criterion with MPNet. The Dual-Side model line is closest to the centre on all six criteria; the largest gaps from the baseline are on Value and Service." /></div>
-            <figcaption><b>Per-criterion RMSE with MPNet</b> (closer to the centre is better). Figure 8 in the thesis.</figcaption>
-          </figure>
-          <div class="prose">
+      <ul class="findings">
+        <li class="card" style="--fc:var(--c-user)"><span class="big">3.51% vs 1.67%</span><b><span data-l="en">Who the user is matters more than what the hotel is</span><span data-l="ja">「どんなホテルか」より「どんなユーザか」が重要</span></b><p data-l="en">With MPNet, user review text alone cut RMSE about twice as much as hotel review text. A user's past writing carries a "rating persona": what they care about (a station nearby, good food, a quiet view) and how strictly they rate.</p><p data-l="ja">MPNet では、ユーザのレビューだけで RMSE がホテルのレビューの約2倍減少した。ユーザの過去の文章には、何を重視するか（駅に近い、食事がおいしい、静かな景色）や評価の厳しさといった「評価の個性（Rating Persona）」が表れている。</p></li>
+        <li class="card" style="--fc:var(--c-dual)"><span class="big">0.8163</span><b><span data-l="en">Fusing both sides works best</span><span data-l="ja">両側の融合が最も効果的</span></b><p data-l="en">The Dual-Side model was the most accurate with both embedding models: 0.8163 with MPNet (−4.47%) and 0.8258 with MiniLM (−2.17%).</p><p data-l="ja">Dual-Side モデルは両方の埋め込みモデルで最も高精度だった。MPNet で 0.8163（−4.47%）、MiniLM で 0.8258（−2.17%）。</p></li>
+        <li class="card" style="--fc:var(--c-uid)"><span class="big">768 vs 384</span><b><span data-l="en">A size and accuracy trade-off</span><span data-l="ja">モデルサイズと精度のトレードオフ</span></b><p data-l="en">MPNet gives the best accuracy. MiniLM is close behind with half-size vectors, less memory and faster training. MPNet suits large booking platforms; MiniLM suits real-time or mobile systems.</p><p data-l="ja">MPNet が最も高精度。MiniLM はベクトルが半分の大きさでメモリ使用量が少なく学習も速いが、精度はわずかに劣る。大規模な予約サイトには MPNet、リアルタイムやモバイル向けには MiniLM が適している。</p></li>
+      </ul>
+
+      <h3><span data-l="en">How the models trained</span><span data-l="ja">学習の推移</span></h3>
+      <div class="prose">
+        <p data-l="en">Validation RMSE fell fastest and lowest for the Dual-Side model. After about 12 epochs the error started to rise again (overfitting), so early stopping kept the best checkpoint.</p>
+        <p data-l="ja">Dual-Side モデルの検証RMSEが最も速く、最も低くまで下がった。約12エポック以降は誤差が再び上昇（過学習）したため、早期終了で最良のモデルを保存した。</p>
+      </div>
+      <div class="figpair">
+        <figure class="card fig">
+          <div class="img"><img src="assets/fig5-learning-minilm.png" width="710" height="468" loading="lazy" data-alt-en="Validation RMSE per epoch with MiniLM embeddings for the four NCF-AG models. The Dual-Side model reaches the lowest error, about 0.825 near epoch 11." data-alt-ja="MiniLM 埋め込みを用いた4モデルのエポックごとの検証RMSE。Dual-Side モデルが最も低く、11エポック付近で約0.825。" alt="" /></div>
+          <figcaption><b>MiniLM <span data-l="en">(384-dim)</span><span data-l="ja">（384次元）</span></b> <span data-l="en">Validation RMSE per epoch.</span><span data-l="ja">エポックごとの検証RMSE。</span></figcaption>
+        </figure>
+        <figure class="card fig">
+          <div class="img"><img src="assets/fig5-learning-mpnet.png" width="665" height="468" loading="lazy" data-alt-en="Validation RMSE per epoch with MPNet embeddings. The Dual-Side model reaches the lowest error, about 0.816 near epochs 10 and 11, below User-Hybrid, Item-Hybrid and the NCF-AG baseline." data-alt-ja="MPNet 埋め込みを用いた4モデルのエポックごとの検証RMSE。Dual-Side モデルが最も低く、10〜11エポック付近で約0.816。" alt="" /></div>
+          <figcaption><b>MPNet <span data-l="en">(768-dim)</span><span data-l="ja">（768次元）</span></b> <span data-l="en">Validation RMSE per epoch. Figure 5 in the thesis.</span><span data-l="ja">エポックごとの検証RMSE。論文の図5。</span></figcaption>
+        </figure>
+      </div>
+
+      <h3><span data-l="en">Improvement across all six criteria</span><span data-l="ja">6つの評価項目すべてで改善</span></h3>
+      <div class="grid-2" style="margin-top:0">
+        <figure class="card fig">
+          <div class="img"><img src="assets/fig8-criteria-radar.jpg" width="961" height="436" loading="lazy" data-alt-en="Radar chart of RMSE for each criterion with MPNet. The Dual-Side model line is closest to the centre on all six criteria; the largest gaps from the baseline are on Value and Service." data-alt-ja="MPNet における評価項目別RMSEのレーダーチャート。Dual-Side モデルが6項目すべてで中心に最も近く、ベースラインとの差は「価値」と「サービス」で最も大きい。" alt="" /></div>
+          <figcaption><b><span data-l="en">Per-criterion RMSE with MPNet</span><span data-l="ja">MPNet における評価項目別のRMSE</span></b> <span data-l="en">(closer to the centre is better). Figure 8 in the thesis.</span><span data-l="ja">（中心に近いほど良い）。論文の図8。</span></figcaption>
+        </figure>
+        <div class="prose side">
+          <div data-l="en">
             <p>The Dual-Side model has the lowest error on every criterion, not only on the overall rating.</p>
             <p>The biggest gains are on the most subjective criteria, <strong>Value</strong> and <strong>Service</strong>. IDs alone can't say why someone felt a stay was poor value; the text of their complaints and praise can.</p>
           </div>
+          <div data-l="ja">
+            <p>Dual-Side モデルは総合評価だけでなく、すべての評価項目で誤差が最も小さい。</p>
+            <p>特に改善が大きいのは、主観的な項目である<strong>価値（Value）</strong>と<strong>サービス（Service）</strong>である。ID だけでは「なぜ割高と感じたのか」はわからないが、不満や称賛の文章からは読み取ることができる。</p>
+          </div>
         </div>
+      </div>
 
-        <h3>Why deep models: the Matrix Factorization baseline</h3>
-        <div class="grid-2" style="margin-top:0">
-          <figure>
-            <div class="fig"><img src="assets/fig4-mf-validation.png" width="756" height="488" loading="lazy" alt="Validation RMSE of Matrix Factorization over about 50 epochs: it falls slowly from about 5 and levels off just above 2 after around 30 epochs." /></div>
-            <figcaption><b>Matrix Factorization.</b> Validation RMSE per epoch. Figure 4 in the thesis.</figcaption>
-          </figure>
-          <div class="prose">
+      <h3><span data-l="en">Why deep models: the Matrix Factorization baseline</span><span data-l="ja">なぜ深層学習か：行列因子分解との比較</span></h3>
+      <div class="grid-2" style="margin-top:0">
+        <figure class="card fig">
+          <div class="img"><img src="assets/fig4-mf-validation.png" width="756" height="488" loading="lazy" data-alt-en="Validation RMSE of Matrix Factorization over about 50 epochs: it falls slowly from about 5 and levels off just above 2 after around 30 epochs." data-alt-ja="行列因子分解の約50エポックにわたる検証RMSE。約5からゆっくり下がり、30エポック付近から2をわずかに上回る値で横ばいになる。" alt="" /></div>
+          <figcaption><b><span data-l="en">Matrix Factorization</span><span data-l="ja">行列因子分解</span></b> <span data-l="en">Validation RMSE per epoch. Figure 4 in the thesis.</span><span data-l="ja">エポックごとの検証RMSE。論文の図4。</span></figcaption>
+        </figure>
+        <div class="prose side">
+          <div data-l="en">
             <p>The linear MF baseline converged slowly, needing more than 30 epochs, and settled above 2.0 RMSE (2.0657 on the test set).</p>
             <p>Every NCF-AG model stayed below 0.86. The non-linear, multi-criteria backbone is what makes the text features worth adding.</p>
+          </div>
+          <div data-l="ja">
+            <p>線形の MF は収束が遅く（30エポック以上）、RMSE は 2.0 を上回る値（テストでは 2.0657）にとどまった。</p>
+            <p>NCF-AG 系のモデルはすべて 0.86 未満である。非線形かつ多基準の骨格があってこそ、テキスト特徴を加える価値がある。</p>
           </div>
         </div>
       </div>
@@ -564,44 +739,47 @@
   <!-- ======================= 6 CONCLUSION ======================= -->
   <section class="chapter" id="conclusion" aria-labelledby="h-con">
     <div class="wrap">
-      <div class="ch-head"><span class="ch-num">6</span><h2 id="h-con">Conclusion</h2></div>
-      <div class="ch-body">
-        <div class="prose">
+      <div class="ch-head"><span class="ch-num">6</span><h2 id="h-con"><span data-l="en">Conclusion</span><span data-l="ja">結論</span></h2></div>
+      <div class="prose">
+        <div data-l="en">
           <p class="lead">Adding semantic profiles of both users and hotels to NCF-AG lowered test RMSE on every model, reaching 0.8163 with the Dual-Side model and MPNet embeddings.</p>
           <p>The main finding is the "user persona": a user's aggregated review history predicts their future ratings better than descriptions of the hotel do. Deep models can learn a user's own rating standards, critical or generous, directly from how they write. That points to a new direction for personalized recommendation.</p>
         </div>
-        <h3>Future work</h3>
-        <ul class="future">
-          <li><b>Attention over reviews</b><span>Learn which reviews or sentences matter most for each prediction, instead of aggregating all text equally.</span></li>
-          <li><b>Profiles that change over time</b><span>Update user embeddings as new reviews arrive, to follow how a rating persona changes over months or years.</span></li>
-          <li><b>Distillation for mobile</b><span>Transfer MPNet's accuracy into the lighter MiniLM architecture for on-device recommendation.</span></li>
-        </ul>
+        <div data-l="ja">
+          <p class="lead">ユーザとホテル双方の意味プロファイルを NCF-AG に加えることで、すべてのモデルでテストRMSEが低下し、MPNet を用いた Dual-Side モデルで 0.8163 を達成した。</p>
+          <p>最も重要な発見は「評価の個性（User Persona）」である。ユーザが過去に書いたレビューの集まりは、ホテルの説明よりも将来の評価をよく予測する。深層学習モデルは、厳しい・甘いといったユーザ固有の評価基準を文章から直接学習できる。これはパーソナライズされた推薦の新たな方向性を示している。</p>
+        </div>
       </div>
+      <h3><span data-l="en">Future work</span><span data-l="ja">今後の課題</span></h3>
+      <ul class="future">
+        <li class="card"><span class="ico" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="3"/></svg></span><b><span data-l="en">Attention over reviews</span><span data-l="ja">レビューへの注意機構</span></b><span data-l="en">Learn which reviews or sentences matter most for each prediction, instead of aggregating all text equally.</span><span data-l="ja">すべてのテキストを均等に集約するのではなく、予測ごとにどのレビューや文が重要かを学習する。</span></li>
+        <li class="card"><span class="ico" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 14l4-4 3 3 7-7"/><path d="M13 6h4v4"/></svg></span><b><span data-l="en">Profiles that change over time</span><span data-l="ja">時間とともに変化するプロファイル</span></b><span data-l="en">Update user embeddings as new reviews arrive, to follow how a rating persona changes over months or years.</span><span data-l="ja">新しいレビューに応じてユーザ埋め込みを更新し、評価の個性が数か月・数年でどう変わるかを捉える。</span></li>
+        <li class="card"><span class="ico" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="6" y="2.5" width="8" height="15" rx="2"/><path d="M9 14.5h2"/></svg></span><b><span data-l="en">Distillation for mobile</span><span data-l="ja">モバイル向けの蒸留</span></b><span data-l="en">Transfer MPNet's accuracy into the lighter MiniLM architecture for on-device recommendation.</span><span data-l="ja">MPNet の精度を軽量な MiniLM に移し、端末上での推薦を可能にする。</span></li>
+      </ul>
     </div>
   </section>
 
   <!-- ======================= REFERENCES ======================= -->
   <section class="chapter" id="references" aria-labelledby="h-ref">
     <div class="wrap">
-      <div class="ch-head"><span class="ch-num" aria-hidden="true"></span><h2 id="h-ref">References</h2></div>
-      <div class="ch-body">
-        <ol class="refs">
-          <li>He, X., Liao, L., Zhang, H., et al.: Neural Collaborative Filtering. <a href="https://arxiv.org/abs/1708.05031">arXiv:1708.05031</a> (2017).</li>
-          <li>Morise, H., Atarashi, K., Oyama, S., et al.: Neural collaborative filtering with multicriteria evaluation data. Applied Soft Computing, 119, 108548 (2022).</li>
-          <li>Diego999: HotelRec, a large-scale (~50M) hotel reviews dataset. <a href="https://github.com/Diego999/HotelRec">github.com/Diego999/HotelRec</a> (accessed 2025-07-22).</li>
-          <li>Reimers, N., Gurevych, I.: Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks. Proc. EMNLP 2019.</li>
-          <li>Song, K., Tan, X., Qin, T., Lu, J., Liu, T.-Y.: MPNet: Masked and Permuted Pre-training for Language Understanding. NeurIPS 33, 16857–16867 (2020).</li>
-          <li>Koren, Y., Bell, R., Volinsky, C.: Matrix factorization techniques for recommender systems. Computer, 42(8), 30–37 (2009).</li>
-        </ol>
-      </div>
+      <div class="ch-head"><h2 id="h-ref"><span data-l="en">References</span><span data-l="ja">参考文献</span></h2></div>
+      <ol class="card refs">
+        <li>He, X., Liao, L., Zhang, H., et al.: Neural Collaborative Filtering. <a href="https://arxiv.org/abs/1708.05031">arXiv:1708.05031</a> (2017).</li>
+        <li>Morise, H., Atarashi, K., Oyama, S., et al.: Neural collaborative filtering with multicriteria evaluation data. Applied Soft Computing, 119, 108548 (2022).</li>
+        <li>Diego999: HotelRec, a large-scale (~50M) hotel reviews dataset. <a href="https://github.com/Diego999/HotelRec">github.com/Diego999/HotelRec</a> (accessed 2025-07-22).</li>
+        <li>Reimers, N., Gurevych, I.: Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks. Proc. EMNLP 2019.</li>
+        <li>Song, K., Tan, X., Qin, T., Lu, J., Liu, T.-Y.: MPNet: Masked and Permuted Pre-training for Language Understanding. NeurIPS 33, 16857–16867 (2020).</li>
+        <li>Koren, Y., Bell, R., Volinsky, C.: Matrix factorization techniques for recommender systems. Computer, 42(8), 30–37 (2009).</li>
+      </ol>
     </div>
   </section>
 </main>
 
 <footer>
   <div class="wrap">
-    <span>© 2026 San Tana, National Institute of Technology, Tsuyama College</span>
-    <a href="https://github.com/Tana-jouhou72/ncf-thesis-viz">Source on GitHub</a>
+    <span class="brand"><span class="brand-mark" aria-hidden="true"><i style="background:#6177A0"></i><i style="background:#A2B0C4"></i><i style="background:#2BB39C"></i><i style="background:#E8A93A"></i></span>© 2026 San Tana</span>
+    <span><span data-l="en">National Institute of Technology, Tsuyama College</span><span data-l="ja">津山工業高等専門学校</span></span>
+    <a class="gh" href="https://github.com/Tana-jouhou72/ncf-thesis-viz"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span data-l="en">Source on GitHub</span><span data-l="ja">GitHub のソース</span></a>
   </div>
 </footer>
 
@@ -610,61 +788,90 @@
 <script>
 'use strict';
 /* All numbers come from the thesis (Table 2). */
-const MODELS = [
-  { key: 'base', name: 'Baseline NCF-AG', short: 'Baseline', color: '--c-base' },
-  { key: 'item', name: 'Item-Text hybrid', short: 'Item-Text', color: '--c-item' },
-  { key: 'user', name: 'User-Text hybrid', short: 'User-Text', color: '--c-user' },
-  { key: 'dual', name: 'Dual-Side (proposed)', short: 'Dual-Side', color: '--c-dual' },
-];
 const RMSE = {
   minilm: { base: 0.8441, item: 0.8362, user: 0.8303, dual: 0.8258 },
   mpnet:  { base: 0.8545, item: 0.8402, user: 0.8245, dual: 0.8163 },
 };
 const gain = (emb, k) => ((RMSE[emb].base - RMSE[emb][k]) / RMSE[emb].base) * 100;
-
+const MODELS = [
+  { key: 'base', color: '--c-base', short: { en: 'Baseline', ja: 'ベースライン' } },
+  { key: 'item', color: '--c-item', short: { en: 'Item-Text', ja: 'Item-Text' } },
+  { key: 'user', color: '--c-user', short: { en: 'User-Text', ja: 'User-Text' } },
+  { key: 'dual', color: '--c-dual', short: { en: 'Dual-Side', ja: 'Dual-Side' } },
+];
 const ARCH = {
   base: {
     parts: ['uid', 'iid'], dim: 128, color: '--c-base',
-    name: 'Baseline NCF-AG', dims: 'Input: 64 + 64 = 128 dimensions (IDs only)',
-    desc: 'The state-of-the-art multi-criteria model, re-implemented as the baseline. It sees only who rated and what was rated. Any gain in the other three models comes from the review text.',
     eq: '\\mathbf{z}_0 = \\mathbf{p}_u \\oplus \\mathbf{q}_i \\in \\mathbb{R}^{128}',
+    en: { name: 'Baseline NCF-AG', dims: 'Input: 64 + 64 = 128 dimensions (IDs only)', desc: 'The state-of-the-art multi-criteria model, re-implemented as the baseline. It sees only who rated and what was rated, so any gain in the other three models comes from the review text.' },
+    ja: { name: 'ベースライン NCF-AG', dims: '入力：64 + 64 = 128 次元（ID のみ）', desc: '最先端の多基準推薦モデルをベースラインとして再実装したもの。誰が何を評価したかだけを見るため、他の3モデルでの改善はすべてレビュー文によるものである。' },
   },
   item: {
     parts: ['uid', 'iid', 'itx'], dim: 192, color: '--c-item',
-    name: 'Item-Text hybrid', dims: 'Input: 64 + 64 + 64 = 192 dimensions',
-    desc: 'Adds the hotel\'s semantic profile: all reviews the hotel received, encoded and projected to 64 numbers. The model can "read" what guests say about cleanliness or location even when the ID signal is weak.',
     eq: "\\mathbf{z}_0 = \\mathbf{p}_u \\oplus \\mathbf{q}_i \\oplus \\mathbf{t}'_i,\\quad \\mathbf{t}' = \\mathrm{ReLU}(W_{proj}\\,\\mathbf{e} + \\mathbf{b}_{proj})",
+    en: { name: 'Item-Text hybrid', dims: 'Input: 64 + 64 + 64 = 192 dimensions', desc: 'Adds the hotel\'s semantic profile: all reviews the hotel received, encoded and projected to 64 numbers. The model can "read" what guests say about cleanliness or location even when the ID signal is weak.' },
+    ja: { name: 'Item-Text ハイブリッド', dims: '入力：64 + 64 + 64 = 192 次元', desc: 'ホテルの意味プロファイル（そのホテルへの全レビューを符号化し、64次元に射影したもの）を加える。ID の情報が少ない場合でも、清潔さや立地についての宿泊者の声を「読む」ことができる。' },
   },
   user: {
     parts: ['uid', 'iid', 'utx'], dim: 192, color: '--c-user',
-    name: 'User-Text hybrid', dims: 'Input: 64 + 64 + 64 = 192 dimensions',
-    desc: 'Adds the user\'s semantic profile: everything the user has written. It tests whether writing style and history reveal a "rating persona", such as someone who always complains about price or is generous with stars.',
     eq: "\\mathbf{z}_0 = \\mathbf{p}_u \\oplus \\mathbf{q}_i \\oplus \\mathbf{t}'_u,\\quad W_{proj} \\in \\mathbb{R}^{64\\times768}",
+    en: { name: 'User-Text hybrid', dims: 'Input: 64 + 64 + 64 = 192 dimensions', desc: 'Adds the user\'s semantic profile: everything the user has written. It tests whether writing style and history reveal a "rating persona", such as someone who always complains about price or is generous with stars.' },
+    ja: { name: 'User-Text ハイブリッド', dims: '入力：64 + 64 + 64 = 192 次元', desc: 'ユーザの意味プロファイル（そのユーザが書いた全レビュー）を加える。いつも価格に厳しい、星を甘くつけるといった「評価の個性（Rating Persona）」が、文章の書き方や過去のレビューに表れるかを検証する。' },
   },
   dual: {
     parts: ['uid', 'iid', 'itx', 'utx'], dim: 256, color: '--c-dual',
-    name: 'Dual-Side fusion (proposed)', dims: 'Input: 64 + 64 + 64 + 64 = 256 dimensions',
-    desc: 'Combines everything: collaborative IDs plus the semantic profiles of both the hotel and the user. The model can match what this user cares about with what this hotel offers. It achieved the lowest error with both embedding models.',
     eq: "\\mathbf{z}_0 = \\mathbf{p}_u \\oplus \\mathbf{q}_i \\oplus \\mathbf{t}'_i \\oplus \\mathbf{t}'_u \\in \\mathbb{R}^{256}",
+    en: { name: 'Dual-Side fusion (proposed)', dims: 'Input: 64 + 64 + 64 + 64 = 256 dimensions', desc: 'Combines everything: collaborative IDs plus the semantic profiles of both the hotel and the user. The model can match what this user cares about with what this hotel offers. It achieved the lowest error with both embedding models.' },
+    ja: { name: 'Dual-Side 融合モデル（提案手法）', dims: '入力：64 + 64 + 64 + 64 = 256 次元', desc: '協調フィルタリングの ID に、ホテルとユーザ双方の意味プロファイルを組み合わせる。このユーザが重視することと、このホテルが提供するものを照らし合わせることができ、両方の埋め込みモデルで最も低い誤差を達成した。' },
+  },
+};
+const T = {
+  en: {
+    title: 'Dual-Side Semantic NCF-AG | San Tana', axis: 'Test RMSE (stars)', light: 'Light: MiniLM (384)', solid: 'Solid: MPNet (768)',
+    only: (e) => `Showing ${e === 'mpnet' ? 'MPNet (768-dim)' : 'MiniLM (384-dim)'} only`, mpS: 'MPNet (solid)', mlL: 'MiniLM (light)',
+    ds: (e) => (e === 'mpnet' ? 'MPNet (768-dim)' : 'MiniLM (384-dim)'), drop: 'lower RMSE', fallback: 'The chart could not load (are you offline?). The same numbers are in Table 2.',
+  },
+  ja: {
+    title: 'Dual-Side Semantic NCF-AG | San Tana（卒業研究）', axis: 'テストRMSE（星）', light: '淡色：MiniLM（384）', solid: '濃色：MPNet（768）',
+    only: (e) => `${e === 'mpnet' ? 'MPNet（768次元）' : 'MiniLM（384次元）'}のみ表示`, mpS: 'MPNet（濃色）', mlL: 'MiniLM（淡色）',
+    ds: (e) => (e === 'mpnet' ? 'MPNet（768次元）' : 'MiniLM（384次元）'), drop: 'RMSE 削減', fallback: 'グラフを読み込めませんでした（オフラインの可能性があります）。同じ数値は表2にあります。',
   },
 };
 
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const lang = () => (document.documentElement.lang === 'ja' ? 'ja' : 'en');
+
+/* ---------- language ---------- */
+function applyLang(l, save) {
+  document.documentElement.lang = l;
+  if (save) {
+    try { localStorage.setItem('thesis-lang', l); } catch (e) {}
+    const u = new URL(location.href);
+    if (u.searchParams.has('lang')) { u.searchParams.set('lang', l); history.replaceState(null, '', u); }
+  }
+  $$('[data-setlang]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.setlang === l));
+  $$('img[data-alt-en]').forEach((img) => (img.alt = l === 'ja' ? img.dataset.altJa : img.dataset.altEn));
+  document.title = T[l].title;
+  showArch(currentArch);
+  buildCharts();
+}
 
 /* ---------- maths ---------- */
 function renderTex(root = document) {
   if (!window.katex) return;
   $$('[data-tex]', root).forEach((el) => {
     try { katex.render(el.dataset.tex, el, { displayMode: el.hasAttribute('data-display'), throwOnError: false }); }
-    catch { el.textContent = el.dataset.tex; }
+    catch (e) { el.textContent = el.dataset.tex; }
   });
 }
 
 /* ---------- architecture explorer ---------- */
+let currentArch = 'dual';
 function showArch(key, focus = false) {
-  const a = ARCH[key];
+  currentArch = key;
+  const a = ARCH[key], txt = a[lang()];
   $$('[data-arch]').forEach((b) => {
     const on = b.dataset.arch === key;
     b.setAttribute('aria-selected', on);
@@ -676,10 +883,11 @@ function showArch(key, focus = false) {
   $$('.zbar span').forEach((el) => el.classList.toggle('gone', !a.parts.includes(el.dataset.part)));
   $('#zdim').textContent = a.dim;
   $('#archOut').style.background = `var(${a.color})`;
-  $('#archName').innerHTML = `<span class="swatch" style="background:var(${a.color})"></span>${a.name}`;
-  $('#archDims').textContent = a.dims;
-  const r = RMSE.mpnet[key], m = RMSE.minilm[key];
-  $('#archDesc').innerHTML = `${a.desc} <br><span class="sans" style="font-size:.9rem;color:var(--ink-2)">Test RMSE: <b style="color:var(--ink)">${r.toFixed(4)}</b> (MPNet), <b style="color:var(--ink)">${m.toFixed(4)}</b> (MiniLM)</span>`;
+  $('#archName').innerHTML = `<span class="swatch" style="background:var(${a.color})"></span>${txt.name}`;
+  $('#archDims').textContent = txt.dims;
+  $('#archDesc').textContent = txt.desc;
+  $('#archMp').textContent = RMSE.mpnet[key].toFixed(4);
+  $('#archMl').textContent = RMSE.minilm[key].toFixed(4);
   const eq = $('#archEq');
   eq.dataset.tex = a.eq;
   eq.setAttribute('data-display', '');
@@ -701,13 +909,10 @@ function tabKeys(list, onPick) {
 
 /* ---------- charts ---------- */
 let rmseChart = null, gainChart = null, embView = 'both';
-function tint(hex, a) { // hex colour → rgba with alpha
+function tint(hex, a) {
   const h = hex.replace('#', '');
   const n = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
-}
-function chartTheme() {
-  return { ink: css('--ink'), ink2: css('--ink-2'), line: css('--line-2'), font: "'IBM Plex Sans', system-ui, sans-serif" };
 }
 const valueLabels = {
   id: 'valueLabels',
@@ -716,7 +921,6 @@ const valueLabels = {
     ctx.save();
     ctx.font = `500 11px ${opts.font}`;
     ctx.fillStyle = opts.color;
-    ctx.textAlign = 'center';
     chart.data.datasets.forEach((ds, di) => {
       const meta = chart.getDatasetMeta(di);
       if (meta.hidden || (opts.minWidth && chart.width < opts.minWidth)) return;
@@ -725,7 +929,7 @@ const valueLabels = {
         if (v == null) return;
         const text = opts.format(v);
         if (opts.horizontal) { ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(text, bar.x + 6, bar.y); }
-        else { ctx.textBaseline = 'bottom'; ctx.fillText(text, bar.x, bar.y - 4); }
+        else { ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText(text, bar.x, bar.y - 4); }
       });
     });
     ctx.restore();
@@ -733,50 +937,56 @@ const valueLabels = {
 };
 function rmseDatasets() {
   const embs = embView === 'both' ? ['minilm', 'mpnet'] : [embView];
-  return embs.map((emb) => ({
-    label: emb === 'mpnet' ? 'MPNet (768-dim)' : 'MiniLM (384-dim)',
-    data: MODELS.map((m) => RMSE[emb][m.key]),
-    backgroundColor: MODELS.map((m) => (emb === 'minilm' && embView === 'both' ? tint(css(m.color), .42) : css(m.color))),
-    borderColor: MODELS.map((m) => css(m.color)),
-    borderWidth: emb === 'minilm' && embView === 'both' ? 1.5 : 0,
-    borderRadius: 3,
-    maxBarThickness: 64,
-  }));
+  return embs.map((emb) => {
+    const light = emb === 'minilm' && embView === 'both';
+    return {
+      label: T[lang()].ds(emb),
+      data: MODELS.map((m) => RMSE[emb][m.key]),
+      backgroundColor: MODELS.map((m) => (light ? tint(css(m.color), .4) : css(m.color))),
+      borderColor: MODELS.map((m) => css(m.color)),
+      borderWidth: light ? 1.5 : 0,
+      borderRadius: 5,
+      maxBarThickness: 64,
+    };
+  });
 }
 function drawLegend() {
-  const box = $('#rmseLegend');
-  const modelKeys = MODELS.map((m) => `<span><i class="swatch" style="background:var(${m.color})"></i>${m.short}</span>`).join('');
+  const t = T[lang()];
+  const keys = MODELS.map((m) => `<span><i class="swatch" style="background:var(${m.color})"></i>${m.short[lang()]}</span>`).join('');
   const emb = embView === 'both'
-    ? '<span><i class="swatch tint" style="background:var(--ink-2)"></i>Light: MiniLM (384)</span><span><i class="swatch" style="background:var(--ink-2)"></i>Solid: MPNet (768)</span>'
-    : `<span>Showing ${embView === 'mpnet' ? 'MPNet (768-dim)' : 'MiniLM (384-dim)'} only</span>`;
-  box.innerHTML = modelKeys + emb;
+    ? `<span><i class="swatch tint" style="background:var(--ink-2)"></i>${t.light}</span><span><i class="swatch" style="background:var(--ink-2)"></i>${t.solid}</span>`
+    : `<span>${t.only(embView)}</span>`;
+  $('#rmseLegend').innerHTML = keys + emb;
 }
 function buildCharts() {
   if (!window.Chart) {
-    $$('.chart-box').forEach((b) => (b.innerHTML = '<p class="chart-fallback">The chart could not load (are you offline?). The same numbers are in Table 2.</p>'));
+    $$('.chart-box').forEach((b) => (b.innerHTML = `<p class="chart-fallback">${T[lang()].fallback}</p>`));
     return;
   }
-  const t = chartTheme();
-  Chart.defaults.font.family = t.font;
-  Chart.defaults.color = t.ink2;
-  const tooltip = { backgroundColor: css('--surface'), titleColor: t.ink, bodyColor: t.ink2, borderColor: css('--line'), borderWidth: 1, padding: 10, titleFont: { weight: '600' } };
+  const t = T[lang()];
+  const ink = css('--ink'), ink2 = css('--ink-2'), grid = css('--line-2'), line = css('--line');
+  const font = lang() === 'ja' ? "'IBM Plex Sans JP', 'IBM Plex Sans', sans-serif" : "'IBM Plex Sans', system-ui, sans-serif";
+  Chart.defaults.font.family = font;
+  Chart.defaults.color = ink2;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tooltip = { backgroundColor: css('--surface'), titleColor: ink, bodyColor: ink2, borderColor: line, borderWidth: 1, padding: 10, cornerRadius: 8, titleFont: { weight: '600' } };
 
   if (rmseChart) rmseChart.destroy();
   rmseChart = new Chart($('#rmseChart'), {
     type: 'bar',
-    data: { labels: MODELS.map((m) => m.short), datasets: rmseDatasets() },
+    data: { labels: MODELS.map((m) => m.short[lang()]), datasets: rmseDatasets() },
     options: {
       responsive: true, maintainAspectRatio: false,
-      animation: { duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 450 },
+      animation: { duration: reduce ? 0 : 450 },
       layout: { padding: { top: 18 } },
       scales: {
-        y: { min: 0.8, max: 0.86, ticks: { stepSize: 0.01, callback: (v) => v.toFixed(2) }, grid: { color: t.line }, border: { display: false }, title: { display: true, text: 'Test RMSE (stars)' } },
-        x: { grid: { display: false }, border: { color: css('--line') }, ticks: { color: t.ink, maxRotation: 0, autoSkip: false, font: (c) => ({ weight: '500', size: c.chart.width < 420 ? 11 : 12 }) } },
+        y: { min: 0.8, max: 0.86, ticks: { stepSize: 0.01, callback: (v) => v.toFixed(2) }, grid: { color: grid }, border: { display: false }, title: { display: true, text: t.axis } },
+        x: { grid: { display: false }, border: { color: line }, ticks: { color: ink, maxRotation: 0, autoSkip: false, font: (c) => ({ weight: '500', size: c.chart.width < 420 ? 11 : 12 }) } },
       },
       plugins: {
         legend: { display: false },
         tooltip: { ...tooltip, callbacks: { label: (c) => `${c.dataset.label}: ${c.raw.toFixed(4)}` } },
-        valueLabels: { font: t.font, color: t.ink2, format: (v) => v.toFixed(4), get minWidth() { return embView === 'both' ? 520 : 0; } },
+        valueLabels: { font, color: ink2, format: (v) => v.toFixed(4), get minWidth() { return embView === 'both' ? 520 : 0; } },
       },
     },
     plugins: [valueLabels],
@@ -785,35 +995,36 @@ function buildCharts() {
 
   if (gainChart) gainChart.destroy();
   const keys = MODELS.slice(1);
+  const solidKey = ink2.startsWith('#') ? ink2 : '#465467';
   gainChart = new Chart($('#gainChart'), {
     type: 'bar',
     data: {
-      labels: keys.map((m) => m.short),
+      labels: keys.map((m) => m.short[lang()]),
       datasets: ['mpnet', 'minilm'].map((emb) => ({
         label: emb === 'mpnet' ? 'MPNet (768)' : 'MiniLM (384)',
         data: keys.map((m) => +gain(emb, m.key).toFixed(2)),
-        backgroundColor: keys.map((m) => (emb === 'minilm' ? tint(css(m.color), .42) : css(m.color))),
+        backgroundColor: keys.map((m) => (emb === 'minilm' ? tint(css(m.color), .4) : css(m.color))),
         borderColor: keys.map((m) => css(m.color)),
         borderWidth: emb === 'minilm' ? 1.5 : 0,
-        borderRadius: 3,
+        borderRadius: 4,
         maxBarThickness: 22,
       })),
     },
     options: {
       indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-      animation: { duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 450 },
+      animation: { duration: reduce ? 0 : 450 },
       layout: { padding: { right: 44 } },
       scales: {
-        x: { min: 0, max: 5, ticks: { callback: (v) => v + '%' }, grid: { color: t.line }, border: { display: false } },
-        y: { grid: { display: false }, ticks: { color: t.ink, font: { weight: '500' } }, border: { color: css('--line') } },
+        x: { min: 0, max: 5, ticks: { callback: (v) => v + '%' }, grid: { color: grid }, border: { display: false } },
+        y: { grid: { display: false }, ticks: { color: ink, font: { weight: '500' } }, border: { color: line } },
       },
       plugins: {
         legend: { position: 'bottom', labels: { boxWidth: 12, boxHeight: 12, generateLabels: () => [
-          { text: 'MPNet (solid)', fillStyle: t.ink2, strokeStyle: t.ink2, lineWidth: 0, fontColor: t.ink2 },
-          { text: 'MiniLM (light)', fillStyle: tint(t.ink2.startsWith('#') ? t.ink2 : '#4A5566', .35), strokeStyle: t.ink2, lineWidth: 1, fontColor: t.ink2 },
+          { text: t.mpS, fillStyle: solidKey, strokeStyle: solidKey, lineWidth: 0, fontColor: ink2 },
+          { text: t.mlL, fillStyle: tint(solidKey, .35), strokeStyle: solidKey, lineWidth: 1, fontColor: ink2 },
         ] } },
-        tooltip: { ...tooltip, callbacks: { label: (c) => `${c.dataset.label}: −${c.raw.toFixed(2)}% RMSE` } },
-        valueLabels: { font: t.font, color: t.ink2, horizontal: true, format: (v) => v.toFixed(2) + '%' },
+        tooltip: { ...tooltip, callbacks: { label: (c) => `${c.dataset.label}: −${c.raw.toFixed(2)}% (${t.drop})` } },
+        valueLabels: { font, color: ink2, horizontal: true, format: (v) => v.toFixed(2) + '%' },
       },
     },
     plugins: [valueLabels],
@@ -829,29 +1040,42 @@ function setEmb(btn) {
   drawLegend();
 }
 
-/* ---------- section highlight in the top bar ---------- */
-function watchSections() {
-  const links = new Map($$('.nav a').map((a) => [a.getAttribute('href').slice(1), a]));
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach((en) => {
-      if (!en.isIntersecting) return;
-      links.forEach((a) => a.classList.remove('on'));
-      const a = links.get(en.target.id);
-      if (a) { a.classList.add('on'); a.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
-    });
-  }, { rootMargin: '-45% 0px -50% 0px' });
-  links.forEach((_, id) => { const s = document.getElementById(id); if (s) io.observe(s); });
+/* ---------- top bar ---------- */
+function watchScroll() {
+  const bar = $('#topbar'), hero = $('#hero'), nav = $('#nav');
+  const links = $$('.nav a');
+  const sections = links.map((a) => document.getElementById(a.getAttribute('href').slice(1)));
+  let ticking = false;
+  const update = () => {
+    ticking = false;
+    const y = window.scrollY;
+    bar.classList.toggle('on-hero', y < hero.offsetHeight - bar.offsetHeight - 8);
+    // highlight the section that is under the upper part of the screen
+    const probe = y + innerHeight * 0.3;
+    let idx = -1;
+    sections.forEach((s, i) => { if (s && s.offsetTop <= probe) idx = i; });
+    links.forEach((a, i) => a.classList.toggle('on', i === idx));
+    // keep the active link visible in the scrollable nav (phones) by scrolling only the nav, never the page
+    const a = links[idx];
+    if (a && nav.scrollWidth > nav.clientWidth) {
+      const left = a.offsetLeft - nav.offsetLeft, right = left + a.offsetWidth;
+      if (left < nav.scrollLeft || right > nav.scrollLeft + nav.clientWidth) nav.scrollLeft = left - 12;
+    }
+  };
+  window.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
+  window.addEventListener('resize', update, { passive: true });
+  update();
 }
 
 window.addEventListener('DOMContentLoaded', () => {
   renderTex();
+  $$('[data-setlang]').forEach((b) => (b.onclick = () => applyLang(b.dataset.setlang, true)));
   $$('[data-arch]').forEach((b) => (b.onclick = () => showArch(b.dataset.arch)));
   tabKeys($('[data-arch]').parentNode, (b) => showArch(b.dataset.arch, true));
   $$('[data-emb]').forEach((b) => { b.onclick = () => setEmb(b); b.tabIndex = b.getAttribute('aria-selected') === 'true' ? 0 : -1; });
   tabKeys($('[data-emb]').parentNode, setEmb);
-  showArch('dual');
-  buildCharts();
-  watchSections();
+  applyLang(lang(), false);
+  watchScroll();
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', buildCharts);
 });
 </script>

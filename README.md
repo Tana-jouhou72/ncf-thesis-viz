@@ -8,6 +8,8 @@ January 22, 2026
 
 **[View the interactive project page →](https://tana-jouhou72.github.io/ncf-thesis-viz/)**
 
+The page is in **English and Japanese**. Use the EN / 日本語 switch in the top bar, or link straight to the Japanese version: [`?lang=ja`](https://tana-jouhou72.github.io/ncf-thesis-viz/?lang=ja)
+
 ---
 
 ## In one paragraph
@@ -104,7 +106,8 @@ ncf-thesis-viz/
 
 - **Charts** are drawn with [Chart.js](https://www.chartjs.org/) from the exact numbers in Table 2.
 - **Equations** are rendered with [KaTeX](https://katex.org/).
-- **Fonts** are IBM Plex Sans and Source Serif 4 from Google Fonts.
+- **Fonts** are IBM Plex Sans, IBM Plex Sans JP and Source Serif 4 from Google Fonts.
+- **Languages:** English and Japanese text are both in `index.html`, with each element marked `data-l="en"` or `data-l="ja"`. The switch shows one language and remembers the choice; it uses the browser language on the first visit.
 - The page works on phones and supports dark mode.
 
 **Run it locally:** open `index.html` in a browser, or serve the folder:
