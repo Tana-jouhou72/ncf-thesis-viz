@@ -1,546 +1,859 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhancing Neural Collaborative Filtering with Semantic Embeddings</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Chosen Palette: Warm Neutrals & Professional Accents -->
-    <!-- Background: #F9FAFB (Gray 50) / #FFF (White) -->
-    <!-- Primary Text: #1F2937 (Gray 800) -->
-    <!-- Accents: 
-         - Baseline: #9CA3AF (Gray 400)
-         - Hybrid (Item): #F59E0B (Amber 500)
-         - Advanced (Full): #10B981 (Emerald 500)
-         - MPNet: #3B82F6 (Blue 500)
-         - MiniLM: #8B5CF6 (Violet 500)
-    -->
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dual-Side Semantic NCF-AG | San Tana</title>
+<meta name="description" content="Graduation research thesis (NIT Tsuyama College, 2026): enhancing Neural Collaborative Filtering by Aggregation with dual-side semantic review embeddings. Test RMSE 0.8163 on 3 million TripAdvisor hotel ratings." />
+<meta name="theme-color" content="#F5F7FA" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#0E131A" media="(prefers-color-scheme: dark)" />
+<meta property="og:title" content="Enhancing Neural Collaborative Filtering by Aggregation with Dual-Side Semantic Review Embeddings" />
+<meta property="og:description" content="Fusing user and hotel review embeddings (MPNet / MiniLM) into NCF-AG. Best test RMSE 0.8163, 4.47% lower than the NCF-AG baseline." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous" />
+<style>
+  :root {
+    --bg: #F5F7FA;
+    --surface: #FFFFFF;
+    --ink: #16202E;
+    --ink-2: #4A5566;
+    --ink-3: #6B7685;
+    --line: #DCE1E8;
+    --line-2: #EBEEF2;
+    /* the four parts of the input vector, and the four models (colours taken from the thesis figures) */
+    --c-uid: #4F6380;   /* user ID  p_u  */
+    --c-iid: #8E9CB0;   /* item ID  q_i  */
+    --c-item: #1C9883;  /* item text t'_i  · Item-Text hybrid */
+    --c-user: #D4931A;  /* user text t'_u  · User-Text hybrid */
+    --c-dual: #3343C2;  /* proposed Dual-Side */
+    --c-base: #97A1AD;  /* baseline NCF-AG */
+    --c-mf: #E07A2F;
+    --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --measure: 68ch;
+    --wide: 1080px;
+    --radius: 10px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0E131A; --surface: #151C25; --ink: #E7ECF2; --ink-2: #A9B4C1; --ink-3: #8592A2;
+      --line: #2A3442; --line-2: #1E2732;
+      --c-uid: #7F96B8; --c-iid: #A9B7C9; --c-item: #3CC4AC; --c-user: #EDB44B; --c-dual: #8391F7; --c-base: #6E7987; --c-mf: #F09A55;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation: none !important; transition: none !important; } }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--serif); font-size: 18px; line-height: 1.7; -webkit-font-smoothing: antialiased; }
+  a { color: var(--c-dual); text-underline-offset: 3px; }
+  :focus-visible { outline: 2px solid var(--c-dual); outline-offset: 2px; border-radius: 4px; }
+  h1, h2, h3, h4 { font-family: var(--sans); color: var(--ink); line-height: 1.2; }
+  p { margin: 0 0 1em; }
+  .sans { font-family: var(--sans); }
+  .wrap { max-width: var(--wide); margin: 0 auto; padding: 0 24px; }
+  .prose { max-width: var(--measure); }
+  .muted { color: var(--ink-2); }
+  sub, sup { line-height: 0; }
 
-    <style>
-        body { font-family: 'Inter', sans-serif; background-color: #F9FAFB; color: #1F2937; }
-        .chart-container { 
-            position: relative; 
-            width: 100%; 
-            max-width: 800px; 
-            margin: 0 auto; 
-            height: 350px; 
-            max-height: 400px; 
-        }
-        @media (max-width: 768px) {
-            .chart-container { height: 250px; }
-        }
-        .nav-item.active { border-bottom: 2px solid #10B981; color: #10B981; font-weight: 600; }
-        .card { background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: transform 0.2s; }
-        .card:hover { transform: translateY(-2px); box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; }
-        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
-    </style>
+  /* ---------- top bar ---------- */
+  .top { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line-2); }
+  .top .wrap { display: flex; align-items: center; gap: 24px; height: 56px; }
+  .brand { font-family: var(--sans); font-weight: 600; font-size: .95rem; color: var(--ink); text-decoration: none; white-space: nowrap; display: flex; align-items: center; gap: 10px; }
+  .brand-mark { display: inline-flex; gap: 2px; }
+  .brand-mark i { width: 6px; height: 16px; border-radius: 2px; display: block; }
+  .nav { display: flex; gap: 4px; margin-left: auto; overflow-x: auto; scrollbar-width: none; }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav a { font-family: var(--sans); font-size: .875rem; color: var(--ink-2); text-decoration: none; padding: 6px 10px; border-radius: 6px; white-space: nowrap; }
+  .nav a:hover { color: var(--ink); background: var(--line-2); }
+  .nav a.on { color: var(--ink); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+  .nav .n { color: var(--ink-3); margin-right: 4px; font-variant-numeric: tabular-nums; }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 72px 0 56px; }
+  .hero-kind { font-family: var(--sans); font-size: .95rem; color: var(--ink-2); margin: 0 0 18px; }
+  .hero h1 { font-size: clamp(1.9rem, 1.2rem + 2.6vw, 3.05rem); font-weight: 600; letter-spacing: -0.015em; margin: 0 0 22px; max-width: 22ch; text-wrap: balance; }
+  .byline { font-family: var(--sans); font-size: 1rem; color: var(--ink-2); margin: 0 0 44px; line-height: 1.6; }
+  .byline b { color: var(--ink); font-weight: 600; }
+
+  /* the input vector z0 — the page's signature */
+  .vec { max-width: 860px; }
+  .vec-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; height: 64px; }
+  .seg { position: relative; border-radius: 4px; display: flex; align-items: center; padding: 0 14px; color: #fff; font-family: var(--sans); font-weight: 600; font-size: 1.05rem; overflow: hidden; transform-origin: left center; }
+  .seg .kx { color: #fff; }
+  .seg.uid { background: var(--c-uid); } .seg.iid { background: var(--c-iid); } .seg.itx { background: var(--c-item); } .seg.utx { background: var(--c-user); }
+  @media (prefers-color-scheme: dark) { .seg, .seg .kx { color: #0E131A; } }
+  .seg::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(100% / 16 - 1px), rgba(255,255,255,.18) calc(100% / 16 - 1px) calc(100% / 16)); }
+  .vec-labels { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; margin-top: 10px; font-family: var(--sans); font-size: .85rem; color: var(--ink-2); line-height: 1.4; }
+  .vec-labels b { display: block; color: var(--ink); font-weight: 500; }
+  .vec-caption { font-family: var(--sans); font-size: .9rem; color: var(--ink-3); margin-top: 14px; }
+  @media (max-width: 560px) {
+    .hero { padding: 40px 0 44px; }
+    .vec-bar { height: 52px; }
+    .vec-labels { font-size: .78rem; }
+    .vec-labels span { overflow-wrap: anywhere; }
+    .vec-labels b { font-size: .82rem; }
+    .vec-labels .why { display: none; }
+    .brand-text { display: none; }
+  }
+  .hero .seg { animation: grow .7s cubic-bezier(.2,.7,.2,1) both; }
+  .hero .seg:nth-child(2) { animation-delay: .12s; } .hero .seg:nth-child(3) { animation-delay: .24s; } .hero .seg:nth-child(4) { animation-delay: .36s; }
+  @keyframes grow { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
+
+  .headline { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; margin-top: 56px; padding-top: 28px; border-top: 1px solid var(--line); max-width: 960px; }
+  .headline p { font-size: 1rem; line-height: 1.55; color: var(--ink-2); margin: 0; }
+  .headline strong { display: block; font-family: var(--sans); font-size: 1.6rem; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  @media (max-width: 760px) { .headline { grid-template-columns: 1fr; gap: 20px; } }
+
+  /* ---------- sections ---------- */
+  section.chapter { padding: 72px 0; border-top: 1px solid var(--line); }
+  .ch-head { display: grid; grid-template-columns: 56px 1fr; align-items: baseline; margin-bottom: 28px; }
+  .ch-num { font-family: var(--sans); font-size: 1.05rem; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .ch-head h2 { font-size: clamp(1.5rem, 1.2rem + 1vw, 2rem); font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+  .ch-body { padding-left: 56px; }
+  @media (max-width: 760px) { .ch-head { grid-template-columns: 40px 1fr; } .ch-body { padding-left: 0; } }
+  h3 { font-size: 1.2rem; font-weight: 600; margin: 48px 0 14px; }
+  h3:first-child { margin-top: 0; }
+  .lead { font-size: 1.22rem; line-height: 1.6; color: var(--ink); }
+
+  /* ---------- background: MF → NCF → NCF-AG ---------- */
+  .lineage { list-style: none; padding: 0; margin: 28px 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+  .lineage li { padding: 22px 22px 18px; position: relative; }
+  .lineage li + li { border-left: 1px solid var(--line); }
+  .lineage h4 { margin: 0 0 2px; font-size: 1.05rem; font-weight: 600; }
+  .lineage .cite { font-family: var(--sans); font-size: .82rem; color: var(--ink-3); margin: 0 0 12px; }
+  .lineage p { font-size: .97rem; line-height: 1.6; color: var(--ink-2); margin: 0 0 12px; }
+  .lineage .eq { margin: 4px 0 0; overflow-x: auto; overflow-y: hidden; font-size: .95rem; color: var(--ink); }
+  .lineage li:last-child { background: color-mix(in srgb, var(--c-dual) 5%, var(--surface)); }
+  @media (max-width: 860px) { .lineage { grid-template-columns: 1fr; } .lineage li + li { border-left: 0; border-top: 1px solid var(--line); } }
+
+  /* ---------- data pipeline ---------- */
+  .pipeline { list-style: none; padding: 0; margin: 24px 0 0; counter-reset: step; max-width: var(--measure); }
+  .pipeline li { position: relative; padding: 0 0 22px 44px; }
+  .pipeline li::before { counter-increment: step; content: counter(step); position: absolute; left: 0; top: 2px; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); font-family: var(--sans); font-size: .8rem; display: grid; place-items: center; color: var(--ink-2); }
+  .pipeline li::after { content: ""; position: absolute; left: 13px; top: 30px; bottom: 4px; width: 1px; background: var(--line); }
+  .pipeline li:last-child::after { display: none; }
+  .pipeline b { font-family: var(--sans); font-weight: 600; font-size: 1rem; display: block; margin-bottom: 2px; }
+  .pipeline span { color: var(--ink-2); font-size: 1rem; line-height: 1.6; }
+  .criteria { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
+  .criteria li { font-family: var(--sans); font-size: .82rem; border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 2px 10px; color: var(--ink-2); }
+
+  .stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); margin: 28px 0 10px; }
+  .stats div { padding: 18px 18px 16px; }
+  .stats div + div { border-left: 1px solid var(--line); }
+  .stats dt { font-family: var(--sans); font-size: .85rem; color: var(--ink-2); margin-bottom: 4px; }
+  .stats dd { margin: 0; font-family: var(--sans); font-size: 1.45rem; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  @media (max-width: 860px) { .stats { grid-template-columns: repeat(2, 1fr); } .stats div + div { border-left: 0; } .stats div { border-top: 1px solid var(--line); } .stats div:nth-child(-n+2) { border-top: 0; } .stats div:nth-child(even) { border-left: 1px solid var(--line); } .stats div:last-child { grid-column: 1 / -1; border-left: 0; } }
+  .note { font-family: var(--sans); font-size: .85rem; color: var(--ink-3); line-height: 1.5; }
+
+  /* ---------- architecture explorer ---------- */
+  .tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  .tabs button { font-family: var(--sans); font-size: .9rem; font-weight: 500; color: var(--ink-2); background: none; border: 0; border-radius: 7px; padding: 8px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+  .tabs button:hover { color: var(--ink); background: var(--line-2); }
+  .tabs button[aria-selected="true"] { color: var(--ink); background: var(--line-2); box-shadow: inset 0 0 0 1px var(--line); }
+  .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; flex: none; }
+
+  .arch { margin-top: 20px; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+  @media (max-width: 900px) { .arch { grid-template-columns: 1fr; } }
+  .diagram { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; font-family: var(--sans); }
+  .inputs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .in { border-radius: 8px; border: 1px solid var(--line); padding: 10px 10px 8px; font-size: .8rem; line-height: 1.35; color: var(--ink-2); transition: opacity .25s, filter .25s; min-height: 100%; }
+  .in b { display: block; color: var(--ink); font-size: .85rem; font-weight: 600; margin-bottom: 4px; }
+  .in .flow { display: block; margin-top: 6px; color: var(--ink-3); }
+  .in.uid { border-top: 4px solid var(--c-uid); } .in.iid { border-top: 4px solid var(--c-iid); } .in.itx { border-top: 4px solid var(--c-item); } .in.utx { border-top: 4px solid var(--c-user); }
+  .off { opacity: .3; filter: grayscale(1); }
+  .arrow { height: 22px; display: grid; place-items: center; color: var(--ink-3); font-size: .8rem; }
+  .arrow::before { content: ""; width: 1px; height: 100%; background: var(--line); }
+  .zbar { display: flex; gap: 2px; height: 30px; }
+  .zbar span { flex: 1; border-radius: 3px; transition: flex .35s cubic-bezier(.2,.7,.2,1), opacity .25s; }
+  .zbar .uid { background: var(--c-uid); } .zbar .iid { background: var(--c-iid); } .zbar .itx { background: var(--c-item); } .zbar .utx { background: var(--c-user); }
+  .zbar span.gone { flex: 0 0 0; opacity: 0; }
+  .zlabel { display: flex; justify-content: space-between; font-size: .8rem; color: var(--ink-2); margin-top: 6px; }
+  .zlabel b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .layer { border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; font-size: .85rem; color: var(--ink-2); display: flex; justify-content: space-between; gap: 10px; align-items: baseline; background: var(--bg); }
+  .layer b { color: var(--ink); font-weight: 600; }
+  .mlp { display: grid; gap: 6px; }
+  .mlp .layer:nth-child(1) { margin: 0; } .mlp .layer:nth-child(2) { margin: 0 9%; } .mlp .layer:nth-child(3) { margin: 0 18%; }
+  .heads { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+  .heads span { border: 1px solid var(--line); border-radius: 6px; font-size: .72rem; text-align: center; padding: 6px 2px; color: var(--ink-2); background: var(--bg); line-height: 1.2; }
+  .out { border-radius: 8px; padding: 10px 12px; color: #fff; font-size: .9rem; font-weight: 600; text-align: center; transition: background .25s; }
+  @media (prefers-color-scheme: dark) { .out { color: #0E131A; } }
+  @media (max-width: 560px) {
+    .inputs { grid-template-columns: repeat(2, 1fr); } .heads { grid-template-columns: repeat(3, 1fr); } .diagram { padding: 14px; }
+    .mlp .layer:nth-child(2) { margin: 0 4%; } .mlp .layer:nth-child(3) { margin: 0 8%; }
+    .tabs { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+    .tabs.three { grid-template-columns: repeat(3, 1fr); }
+    .tabs button { justify-content: center; padding: 9px 6px; }
+    .tabs .long { display: none; }
+  }
+
+  .arch-text h4 { font-size: 1.15rem; margin: 0 0 6px; font-weight: 600; display: flex; gap: 10px; align-items: center; }
+  .arch-text .dims { font-family: var(--sans); font-size: .9rem; color: var(--ink-2); margin: 0 0 14px; }
+  .arch-text p { font-size: 1.02rem; }
+  .arch-text .eqblock { margin: 14px 0 0; padding: 12px 14px; border-left: 3px solid var(--line); background: var(--surface); border-radius: 0 8px 8px 0; overflow-x: auto; font-size: .95rem; }
+
+  /* ---------- setup ---------- */
+  .spec { display: grid; grid-template-columns: max-content 1fr; gap: 0 28px; margin: 0; max-width: 760px; font-family: var(--sans); font-size: .98rem; }
+  .spec dt, .spec dd { padding: 10px 0; border-top: 1px solid var(--line-2); margin: 0; }
+  .spec dt { color: var(--ink-2); }
+  .spec dd { color: var(--ink); }
+  .spec dt:first-of-type, .spec dt:first-of-type + dd { border-top: 0; }
+  @media (max-width: 560px) { .spec { grid-template-columns: 1fr; } .spec dd { border-top: 0; padding-top: 0; } }
+  .eqs { display: grid; gap: 10px; margin-top: 22px; max-width: 760px; }
+  .eqs .eqrow { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 16px; overflow-x: auto; }
+  .eqs .eqrow small { font-family: var(--sans); color: var(--ink-3); font-size: .8rem; }
+
+  /* ---------- results ---------- */
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; }
+  .panel-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .panel-head h4 { font-family: var(--sans); font-size: 1.02rem; font-weight: 600; margin: 0; }
+  .chart-box { position: relative; height: 340px; }
+  @media (max-width: 560px) { .chart-box { height: 300px; } .panel { padding: 16px; } }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; font-family: var(--sans); font-size: .85rem; color: var(--ink-2); margin-top: 12px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .tint { opacity: .45; }
+  .grid-2 { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 24px; margin-top: 24px; align-items: start; }
+  @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  table.rt { width: 100%; border-collapse: collapse; font-family: var(--sans); font-size: .95rem; font-variant-numeric: tabular-nums; }
+  .rt caption { text-align: left; font-weight: 600; font-size: 1.02rem; color: var(--ink); padding-bottom: 12px; }
+  .rt th, .rt td { padding: 10px 8px; border-bottom: 1px solid var(--line-2); text-align: right; }
+  .rt th:first-child, .rt td:first-child { text-align: left; padding-left: 0; }
+  .rt thead th { font-weight: 500; color: var(--ink-2); font-size: .85rem; border-bottom: 1px solid var(--line); }
+  .rt td.m { display: flex; align-items: center; gap: 8px; }
+  .rt tr.best td { font-weight: 600; }
+  .rt tr.best td:nth-child(3) { color: var(--c-dual); }
+  .rt .na { color: var(--ink-3); }
+
+  .findings { list-style: none; padding: 0; margin: 28px 0 0; display: grid; gap: 0; max-width: 860px; }
+  .findings li { display: grid; grid-template-columns: 6px 1fr; gap: 18px; padding: 18px 0; border-top: 1px solid var(--line-2); }
+  .findings li::before { content: ""; border-radius: 3px; background: var(--fc, var(--line)); }
+  .findings b { font-family: var(--sans); font-size: 1.05rem; font-weight: 600; display: block; margin-bottom: 4px; }
+  .findings p { margin: 0; color: var(--ink-2); font-size: 1rem; }
+
+  figure { margin: 0; }
+  .fig { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+  .fig img { display: block; width: 100%; height: auto; }
+  figcaption { font-family: var(--sans); font-size: .87rem; color: var(--ink-2); line-height: 1.5; margin-top: 10px; }
+  figcaption b { color: var(--ink); font-weight: 600; }
+  .figpair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+  @media (max-width: 760px) { .figpair { grid-template-columns: 1fr; } }
+
+  /* ---------- conclusion ---------- */
+  .future { list-style: none; padding: 0; margin: 20px 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .future li { border-top: 2px solid var(--ink); padding-top: 14px; }
+  .future b { font-family: var(--sans); font-weight: 600; display: block; margin-bottom: 6px; font-size: 1.02rem; }
+  .future span { color: var(--ink-2); font-size: .98rem; line-height: 1.6; display: block; }
+  @media (max-width: 760px) { .future { grid-template-columns: 1fr; } }
+
+  .refs { padding-left: 0; list-style: none; font-size: .95rem; line-height: 1.6; color: var(--ink-2); max-width: 820px; counter-reset: ref; }
+  .refs li { position: relative; padding-left: 40px; margin-bottom: 10px; }
+  .refs li::before { counter-increment: ref; content: "[" counter(ref) "]"; position: absolute; left: 0; font-family: var(--sans); color: var(--ink-3); font-size: .88rem; }
+  .refs a { word-break: break-word; }
+
+  footer { border-top: 1px solid var(--line); padding: 36px 0 48px; font-family: var(--sans); font-size: .88rem; color: var(--ink-3); }
+  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+  footer a { color: var(--ink-2); }
+
+  .kx { font-size: 1.04em; }
+  .katex { font-size: 1.05em; }
+  .chart-fallback { font-family: var(--sans); font-size: .9rem; color: var(--ink-3); }
+</style>
 </head>
-<body class="flex flex-col min-h-screen">
+<body>
 
-    <!-- Application Structure Plan:
-         1. Hero Section: Title, Student Info, High-level Abstract.
-         2. Interactive Methodology: A conceptual block diagram showing how SBERT integrates with NCF.
-         3. "New Results" Dashboard: The core interactive section.
-            - Controls: Toggle between MPNet (High Accuracy) and MiniLM (Fast).
-            - Tab 1: Learning Curves (Loss/RMSE over epochs) - recreated from jpgs.
-            - Tab 2: Ablation Study (Bar charts comparing Baseline vs Hybrid vs Full).
-            - Tab 3: Percent Gain (Visualizing the improvement).
-         4. Key Insights & Conclusion: Textual summary of the findings.
-         
-         Rational: The user wants to showcase "New Results". Placing them in a central, togglable dashboard allows immediate comparison between the two models (MPNet vs MiniLM) without cluttering the page with static images.
-    -->
-
-    <!-- Navigation -->
-    <nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <span class="text-xl font-bold text-gray-800 tracking-tight">Thesis<span class="text-emerald-500">Viz</span></span>
-                </div>
-                <div class="hidden sm:flex space-x-8 items-center">
-                    <button onclick="scrollToSection('abstract')" class="nav-item text-gray-500 hover:text-gray-900 px-3 py-2 text-sm font-medium">Abstract</button>
-                    <button onclick="scrollToSection('methodology')" class="nav-item text-gray-500 hover:text-gray-900 px-3 py-2 text-sm font-medium">Methodology</button>
-                    <button onclick="scrollToSection('results')" class="nav-item text-gray-500 hover:text-gray-900 px-3 py-2 text-sm font-medium active">New Results</button>
-                    <button onclick="scrollToSection('conclusion')" class="nav-item text-gray-500 hover:text-gray-900 px-3 py-2 text-sm font-medium">Conclusion</button>
-                </div>
-            </div>
-        </div>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Back to top">
+      <span class="brand-mark" aria-hidden="true"><i style="background:var(--c-uid)"></i><i style="background:var(--c-iid)"></i><i style="background:var(--c-item)"></i><i style="background:var(--c-user)"></i></span>
+      <span class="brand-text">Dual-Side NCF-AG</span>
+    </a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#introduction"><span class="n">1</span>Introduction</a>
+      <a href="#background"><span class="n">2</span>Background</a>
+      <a href="#method"><span class="n">3</span>Method</a>
+      <a href="#experiment"><span class="n">4</span>Experiment</a>
+      <a href="#results"><span class="n">5</span>Results</a>
+      <a href="#conclusion"><span class="n">6</span>Conclusion</a>
     </nav>
+  </div>
+</header>
 
-    <!-- Hero Section -->
-    <header id="abstract" class="bg-white">
-        <div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-            <div class="lg:grid lg:grid-cols-2 lg:gap-8 items-center">
-                <div>
-                    <h1 class="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
-                        Enhancing Neural Collaborative Filtering with <span class="text-emerald-600">Semantic Review Embeddings</span>
-                    </h1>
-                    <p class="mt-4 text-lg text-gray-500">
-                        San Tana | Graduation Thesis (Mid-Term Report)<br>
-                        National Institute of Technology, Tsuyama College
-                    </p>
-                    <p class="mt-6 text-gray-600 leading-relaxed">
-                        Traditional recommendation systems often rely solely on User-Item interaction IDs. This research proposes a <strong>Hybrid Neural Collaborative Filtering (NCF)</strong> architecture that integrates semantic understanding of reviews using <strong>SBERT (MPNet & MiniLM)</strong>. 
-                    </p>
-                    <div class="mt-8 flex gap-4">
-                        <div class="bg-emerald-50 rounded-lg p-4 border border-emerald-100">
-                            <span class="block text-sm font-bold text-emerald-800 uppercase">Core Innovation</span>
-                            <span class="text-emerald-700">Replacing static IDs with dynamic, semantic embeddings from user reviews.</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="mt-10 lg:mt-0 relative">
-                    <!-- Abstract Stats/Highlights -->
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="card p-6 text-center bg-gradient-to-br from-blue-50 to-white">
-                            <div class="text-3xl font-bold text-blue-600">~50M</div>
-                            <div class="text-sm text-gray-500">Hotel Reviews Dataset</div>
-                        </div>
-                        <div class="card p-6 text-center bg-gradient-to-br from-emerald-50 to-white">
-                            <div class="text-3xl font-bold text-emerald-600">+12%</div>
-                            <div class="text-sm text-gray-500">RMSE Improvement (Full Model)</div>
-                        </div>
-                        <div class="card p-6 text-center bg-gradient-to-br from-violet-50 to-white">
-                            <div class="text-3xl font-bold text-violet-600">2</div>
-                            <div class="text-sm text-gray-500">SBERT Models Tested (MPNet & MiniLM)</div>
-                        </div>
-                        <div class="card p-6 text-center bg-gradient-to-br from-amber-50 to-white">
-                            <div class="text-3xl font-bold text-amber-600">Hybrid</div>
-                            <div class="text-sm text-gray-500">ID + User Text + Item Text</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+<main id="top">
+  <!-- ======================= HERO ======================= -->
+  <div class="hero">
+    <div class="wrap">
+      <p class="hero-kind">Graduation research thesis, National Institute of Technology, Tsuyama College</p>
+      <h1>Enhancing Neural Collaborative Filtering by Aggregation with Dual-Side Semantic Review Embeddings</h1>
+      <p class="byline"><b>San Tana</b>, advised by <b>Kanshin Bou</b><br />Department of Integrated Science and Technology, Communication and Information Systems Program<br />January 22, 2026</p>
+
+      <div class="vec" role="img" aria-label="The proposed model's input vector z0: four 64-dimensional parts — user ID embedding, hotel ID embedding, hotel review embedding, and user review embedding — 256 dimensions in total.">
+        <div class="vec-bar" aria-hidden="true">
+          <div class="seg uid"><span class="kx" data-tex="\mathbf{p}_u"></span></div>
+          <div class="seg iid"><span class="kx" data-tex="\mathbf{q}_i"></span></div>
+          <div class="seg itx"><span class="kx" data-tex="\mathbf{t}'_i"></span></div>
+          <div class="seg utx"><span class="kx" data-tex="\mathbf{t}'_u"></span></div>
         </div>
-    </header>
-
-    <!-- Methodology Section -->
-    <section id="methodology" class="py-12 bg-gray-50 border-t border-gray-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-10">
-                <h2 class="text-2xl font-bold text-gray-900">Proposed Architecture</h2>
-                <p class="mt-2 text-gray-600 max-w-2xl mx-auto">
-                    Comparison between the standard NCF Baseline and the proposed Hybrid model incorporating semantic vectors.
-                </p>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-                <!-- Interactive Diagram Switcher -->
-                <div class="flex justify-center mb-8">
-                    <div class="bg-gray-100 p-1 rounded-lg inline-flex">
-                        <button onclick="setArch('baseline')" id="btn-baseline" class="px-4 py-2 rounded-md text-sm font-medium bg-white shadow-sm text-gray-900 transition-all">Baseline (IDs Only)</button>
-                        <button onclick="setArch('hybrid')" id="btn-hybrid" class="px-4 py-2 rounded-md text-sm font-medium text-gray-500 hover:text-gray-900 transition-all">Proposed (Hybrid NCF)</button>
-                    </div>
-                </div>
-
-                <!-- Diagram Visualization (CSS/Flexbox) -->
-                <div id="diagram-container" class="flex flex-col items-center justify-center space-y-4 transition-all duration-500">
-                    <!-- Top Layer: Inputs -->
-                    <div class="flex space-x-12">
-                        <div class="flex flex-col items-center">
-                            <div class="h-12 w-32 bg-gray-200 rounded flex items-center justify-center font-mono text-sm border-2 border-gray-300">User ID</div>
-                            <div class="h-8 w-0.5 bg-gray-300"></div>
-                            <div class="h-10 w-32 bg-blue-100 rounded flex items-center justify-center text-xs text-blue-800 border border-blue-200">Embedding Layer</div>
-                        </div>
-                        
-                        <!-- Hybrid Elements (Hidden by default) -->
-                        <div id="hybrid-inputs" class="hidden flex space-x-12 opacity-0 transition-opacity duration-500">
-                            <div class="flex flex-col items-center">
-                                <div class="h-12 w-32 bg-amber-50 rounded flex items-center justify-center font-mono text-sm border-2 border-amber-200">Review Text</div>
-                                <div class="h-8 w-0.5 bg-amber-300"></div>
-                                <div class="h-10 w-32 bg-amber-100 rounded flex items-center justify-center text-xs text-amber-800 border border-amber-200 font-bold">SBERT (MPNet)</div>
-                            </div>
-                        </div>
-
-                        <div class="flex flex-col items-center">
-                            <div class="h-12 w-32 bg-gray-200 rounded flex items-center justify-center font-mono text-sm border-2 border-gray-300">Item ID</div>
-                            <div class="h-8 w-0.5 bg-gray-300"></div>
-                            <div class="h-10 w-32 bg-blue-100 rounded flex items-center justify-center text-xs text-blue-800 border border-blue-200">Embedding Layer</div>
-                        </div>
-                    </div>
-
-                    <!-- Merge Layer -->
-                    <div class="h-8 w-0.5 bg-gray-400"></div>
-                    <div class="h-12 w-64 bg-gray-800 rounded flex items-center justify-center text-white text-sm font-bold shadow-lg">
-                        Concatenation Layer
-                    </div>
-                    <div class="h-8 w-0.5 bg-gray-400"></div>
-
-                    <!-- MLP Layer -->
-                    <div class="p-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 w-full max-w-md text-center">
-                        <span class="text-xs font-bold text-gray-500 uppercase tracking-wide">Multi-Layer Perceptron (MLP)</span>
-                        <div class="flex flex-col items-center mt-2 space-y-2">
-                            <div class="h-2 w-3/4 bg-gray-300 rounded-full"></div>
-                            <div class="h-2 w-1/2 bg-gray-300 rounded-full"></div>
-                            <div class="h-2 w-1/4 bg-gray-300 rounded-full"></div>
-                        </div>
-                    </div>
-
-                    <!-- Output -->
-                    <div class="h-8 w-0.5 bg-gray-400"></div>
-                    <div class="h-12 w-32 bg-emerald-500 rounded flex items-center justify-center text-white font-bold shadow-md">
-                        Prediction ŷ
-                    </div>
-                </div>
-            </div>
+        <div class="vec-labels" aria-hidden="true">
+          <span><b>User ID</b><span class="why">who is rating</span></span>
+          <span><b>Hotel ID</b><span class="why">what is rated</span></span>
+          <span><b>Hotel reviews</b><span class="why">every review the hotel received</span></span>
+          <span><b>User reviews</b><span class="why">everything the user has written</span></span>
         </div>
-    </section>
+        <p class="vec-caption">Each part is 64 numbers, so the model reads 256 in total. The two review parts are what this thesis adds to NCF-AG.</p>
+      </div>
 
-    <!-- RESULTS DASHBOARD (The Core) -->
-    <section id="results" class="py-12 bg-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex flex-col md:flex-row justify-between items-end mb-8">
-                <div>
-                    <h2 class="text-3xl font-bold text-gray-900">New Experimental Results</h2>
-                    <p class="mt-2 text-gray-600">Analysis of the retrained models (August 2025).</p>
-                </div>
-                <!-- Model Selector -->
-                <div class="mt-4 md:mt-0 bg-gray-100 p-1 rounded-lg inline-flex">
-                    <button onclick="updateDashboard('mpnet')" id="sel-mpnet" class="px-4 py-2 rounded-md text-sm font-medium bg-white shadow-sm text-blue-600 transition-all">MPNet (High Accuracy)</button>
-                    <button onclick="updateDashboard('minilm')" id="sel-minilm" class="px-4 py-2 rounded-md text-sm font-medium text-gray-500 hover:text-violet-600 transition-all">MiniLM (High Speed)</button>
-                </div>
-            </div>
+      <div class="headline">
+        <p><strong>0.8163 RMSE</strong>Best test error, from the proposed Dual-Side model with MPNet embeddings: 4.47% lower than the NCF-AG baseline.</p>
+        <p><strong>User text &gt; hotel text</strong>With MPNet, a user's own reviews improve accuracy about twice as much as the hotel's reviews do.</p>
+        <p><strong>3,029,888 ratings</strong>From 366,058 users on 122,376 hotels (TripAdvisor HotelRec), each with six criteria ratings and review text.</p>
+      </div>
+    </div>
+  </div>
 
-            <!-- Dashboard Grid -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                
-                <!-- Main Chart Area (Learning Curves) -->
-                <div class="lg:col-span-2 space-y-8">
-                    <div class="card p-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-bold text-gray-900 flex items-center">
-                                <span class="mr-2">📈</span> Learning Curves
-                            </h3>
-                            <div class="flex space-x-2 text-xs">
-                                <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-gray-400 mr-1"></span> Baseline</span>
-                                <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-amber-500 mr-1"></span> Hybrid (Item)</span>
-                                <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-emerald-500 mr-1"></span> Advanced (Full)</span>
-                            </div>
-                        </div>
-                        <!-- Visualization & Content Choices:
-                             Goal: Change - Show how the model improves over time.
-                             Method: Line Chart (Chart.js).
-                             Interaction: Hover for specific epoch values.
-                             Justification: Replaces static '1_learning_mpnet.jpg'.
-                        -->
-                        <div class="chart-container">
-                            <canvas id="learningCurveChart"></canvas>
-                        </div>
-                        <p id="learning-caption" class="mt-4 text-sm text-gray-500 text-center italic">
-                            Figure: Training RMSE loss reduction over 10 epochs. The Advanced model converges faster and lower.
-                        </p>
-                    </div>
+  <!-- ======================= 1 INTRODUCTION ======================= -->
+  <section class="chapter" id="introduction" aria-labelledby="h-intro">
+    <div class="wrap">
+      <div class="ch-head"><span class="ch-num">1</span><h2 id="h-intro">Introduction</h2></div>
+      <div class="ch-body prose">
+        <p class="lead">Recommendation systems help people choose from millions of products, videos and hotels. Most learn only from star ratings, and ignore the reviews people take the time to write.</p>
+        <p>A rating says <em>how much</em> someone liked a hotel. The review says <em>why</em>: the quiet room, the rude front desk, the station five minutes away. It also shows who the reviewer is: what they care about, and how strictly they rate.</p>
+        <p>This thesis brings that text into a strong deep-learning recommender, <strong>NCF-AG</strong> (Neural Collaborative Filtering by Aggregation), which already predicts six detailed criteria ratings before the overall score. The work has three parts:</p>
+        <ol>
+          <li>Re-implement NCF-AG as a high-performance baseline.</li>
+          <li>Build hybrid models that add hotel review text, user review text, and both together (the proposed Dual-Side model).</li>
+          <li>Measure how much each kind of text improves rating prediction on a large real-world dataset.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
 
-                    <!-- Final Comparison Bar Chart -->
-                    <div class="card p-6">
-                        <h3 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
-                            <span class="mr-2">📊</span> RMSE Performance Comparison (Lower is Better)
-                        </h3>
-                        <div class="chart-container" style="height: 300px;">
-                            <canvas id="comparisonChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Sidebar Stats & Insights -->
-                <div class="lg:col-span-1 space-y-6">
-                    
-                    <!-- KPI Cards -->
-                    <div class="card p-6 border-l-4 border-emerald-500">
-                        <h4 class="text-sm font-medium text-gray-500 uppercase">Best Performance (RMSE)</h4>
-                        <div class="mt-2 flex items-baseline">
-                            <span id="best-rmse" class="text-3xl font-extrabold text-gray-900">0.7842</span>
-                            <span class="ml-2 text-sm font-medium text-emerald-600">Advanced Model</span>
-                        </div>
-                        <p class="mt-1 text-xs text-gray-400">Vs Baseline: 0.8910</p>
-                    </div>
-
-                    <div class="card p-6 border-l-4 border-blue-500">
-                        <h4 class="text-sm font-medium text-gray-500 uppercase">Percent Improvement</h4>
-                        <div class="mt-2 flex items-baseline">
-                            <span id="percent-gain" class="text-3xl font-extrabold text-gray-900">12.4%</span>
-                            <span class="ml-2 text-sm font-medium text-blue-600">Gain</span>
-                        </div>
-                        <p class="mt-1 text-xs text-gray-400">Calculated on Test Set 2</p>
-                    </div>
-
-                    <!-- Master Table (Simplified) -->
-                    <div class="card overflow-hidden">
-                        <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                            <h3 class="text-sm font-bold text-gray-700">Thesis Master Table</h3>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200 text-sm">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-4 py-3 text-left font-medium text-gray-500">Model</th>
-                                        <th class="px-4 py-3 text-right font-medium text-gray-500">RMSE</th>
-                                        <th class="px-4 py-3 text-right font-medium text-gray-500">MAE</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="master-table-body" class="bg-white divide-y divide-gray-200">
-                                    <!-- Populated by JS -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Insight Text -->
-                    <div class="bg-blue-50 rounded-xl p-6 border border-blue-100">
-                        <h4 class="text-sm font-bold text-blue-800 mb-2">Key Observation</h4>
-                        <p id="insight-text" class="text-sm text-blue-700 leading-relaxed">
-                            MPNet embeddings provide a deeper semantic understanding, resulting in lower error rates compared to MiniLM. However, the <strong>Full Architecture (User + Item Text)</strong> consistently outperforms the Baseline across both embedding types.
-                        </p>
-                    </div>
-
-                </div>
-            </div>
+  <!-- ======================= 2 BACKGROUND ======================= -->
+  <section class="chapter" id="background" aria-labelledby="h-bg">
+    <div class="wrap">
+      <div class="ch-head"><span class="ch-num">2</span><h2 id="h-bg">Background</h2></div>
+      <div class="ch-body">
+        <div class="prose">
+          <p>Collaborative filtering assumes that people who agreed in the past will agree again. Each step below keeps that idea but models it with more power. The last one is the baseline this thesis builds on.</p>
         </div>
-    </section>
+        <ol class="lineage">
+          <li>
+            <h4>Matrix Factorization</h4>
+            <p class="cite">Koren et al., 2009 [6]</p>
+            <p>Users and items become vectors in a shared space; a rating is predicted by their dot product. Simple and fast, but only linear.</p>
+            <div class="eq kx" data-tex="\hat{y}_{ui} = \mathbf{p}_u^{\top}\mathbf{q}_i = \sum_{k=1}^{K} p_{uk}\,q_{ik}" data-display></div>
+          </li>
+          <li>
+            <h4>Neural Collaborative Filtering</h4>
+            <p class="cite">He et al., 2017 [1]</p>
+            <p>Replaces the dot product with a neural network. The MLP variant concatenates the user and item embeddings and learns non-linear interactions through stacked ReLU layers.</p>
+            <div class="eq kx" data-tex="\mathbf{z}_1 = [\,\mathbf{p}_u,\ \mathbf{q}_i\,],\quad \hat{y}_{ui} = \sigma\!\left(\mathbf{h}^{\top}\phi_L(\mathbf{z}_{L-1})\right)" data-display></div>
+          </li>
+          <li>
+            <h4>NCF by Aggregation (NCF-AG)</h4>
+            <p class="cite">Morise et al., 2022 [2]</p>
+            <p>Uses multi-criteria ratings. Stage 1 predicts each criterion (service, location, …); stage 2 aggregates them into the overall rating, much like a person forming an overall opinion.</p>
+            <div class="eq kx" data-tex="\hat{R}^{1}_{ui} = a_{out}\!\left(\mathbf{h}^{\top}[\hat{R}^{l}_{ui}]\right),\ l = 2,\dots,L" data-display></div>
+          </li>
+        </ol>
+        <p class="note" style="margin-top:14px">All three use only IDs and numbers. None of them reads the review text.</p>
+      </div>
+    </div>
+  </section>
 
-    <!-- Conclusion Section -->
-    <section id="conclusion" class="py-12 bg-gray-50 border-t border-gray-200">
-        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 class="text-2xl font-bold text-gray-900 mb-6">Conclusion & Future Work</h2>
-            <div class="prose prose-blue text-gray-600">
-                <p class="mb-4">
-                    This study demonstrated that incorporating semantic review embeddings into Neural Collaborative Filtering significantly enhances recommendation accuracy. By moving beyond static IDs, the model captures the nuances of user preferences and item characteristics.
-                </p>
-                <ul class="list-disc pl-5 space-y-2 mb-6">
-                    <li><strong>Integration Success:</strong> Both MPNet and MiniLM effectively improved RMSE and MAE scores over the baseline.</li>
-                    <li><strong>Full Model Superiority:</strong> Utilizing both User and Item textual features yielded the highest performance gains.</li>
-                    <li><strong>Trade-offs:</strong> While MPNet is more accurate, MiniLM offers a viable, efficient alternative for resource-constrained environments.</li>
-                </ul>
-                <p>
-                    <strong>Future Directions:</strong> Future work could explore attention mechanisms to weigh specific sentences within reviews dynamically, or replace the MLP interaction function with Transformer-based architectures for even deeper context awareness.
-                </p>
+  <!-- ======================= 3 METHOD ======================= -->
+  <section class="chapter" id="method" aria-labelledby="h-method">
+    <div class="wrap">
+      <div class="ch-head"><span class="ch-num">3</span><h2 id="h-method">Method</h2></div>
+      <div class="ch-body">
+        <h3>3.1 Data: from 50 million reviews to a dense core</h3>
+        <div class="prose">
+          <p>The raw <strong>HotelRec</strong> dataset [3] is a single 40 GB JSON file of about 50 million TripAdvisor hotel reviews. Each review has user and hotel IDs, an overall rating (1–5), six criteria ratings, and the review text.</p>
+          <ul class="criteria" aria-label="The six criteria">
+            <li>Service</li><li>Cleanliness</li><li>Value</li><li>Sleep quality</li><li>Rooms</li><li>Location</li>
+          </ul>
+        </div>
+        <ol class="pipeline">
+          <li><b>Stream the file</b><span>Read one review at a time so the 40 GB file never has to fit in memory; drop reviews with invalid user IDs (null, undefined).</span></li>
+          <li><b>Remove rare users and hotels</b><span>Keep only users and hotels with at least 5 interactions in the whole dataset.</span></li>
+          <li><b>Keep complete reviews</b><span>Keep only reviews that have review text and all six criteria ratings.</span></li>
+          <li><b>5-core decomposition</b><span>Repeatedly remove any user or hotel with fewer than 5 remaining interactions, until every user has rated at least 5 hotels and every hotel has at least 5 reviews.</span></li>
+          <li><b>Map IDs to integers</b><span>Turn string IDs into continuous indices for the embedding layers.</span></li>
+          <li><b>Build semantic profiles</b><span>For every hotel, join all its reviews into one document; for every user, join all reviews they wrote. Encode each with a Sentence Transformer [4]: <em>all-MiniLM-L6-v2</em> (384 dimensions, fast) or <em>all-mpnet-base-v2</em> [5] (768 dimensions, more accurate).</span></li>
+        </ol>
+
+        <dl class="stats" aria-label="Final dataset statistics (Table 1)">
+          <div><dt>Users</dt><dd>366,058</dd></div>
+          <div><dt>Hotels</dt><dd>122,376</dd></div>
+          <div><dt>Ratings</dt><dd>3,029,888</dd></div>
+          <div><dt>Criteria</dt><dd>6</dd></div>
+          <div><dt>Sparsity</dt><dd>99.99%</dd></div>
+        </dl>
+        <p class="note prose">Table 1. Final filtered dataset. About 25 ratings per hotel; extremely sparse, as real recommendation data usually is. The 5-core filter and NCF-AG's multi-task learning (7 ratings per review) help with that.</p>
+
+        <h3 id="architectures">3.2 Four architectures, one backbone</h3>
+        <div class="prose">
+          <p>All four models share the same NCF-AG backbone: an MLP tower, six criteria heads and an aggregation layer. They differ only in what goes into the first layer. Text embeddings (384 or 768 numbers) would drown out the 64-number ID embeddings, so each one is first compressed to 64 by a learned projection.</p>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="Choose an architecture">
+          <button role="tab" id="tab-base" aria-controls="arch-panel" aria-selected="false" data-arch="base"><span class="swatch" style="background:var(--c-base)"></span>Baseline<span class="long">&nbsp;NCF-AG</span></button>
+          <button role="tab" id="tab-item" aria-controls="arch-panel" aria-selected="false" data-arch="item"><span class="swatch" style="background:var(--c-item)"></span>Item-Text</button>
+          <button role="tab" id="tab-user" aria-controls="arch-panel" aria-selected="false" data-arch="user"><span class="swatch" style="background:var(--c-user)"></span>User-Text</button>
+          <button role="tab" id="tab-dual" aria-controls="arch-panel" aria-selected="true" data-arch="dual"><span class="swatch" style="background:var(--c-dual)"></span>Dual-Side<span class="long">&nbsp;(proposed)</span></button>
+        </div>
+
+        <div class="arch" id="arch-panel" role="tabpanel" aria-labelledby="tab-dual">
+          <div class="diagram" aria-hidden="true">
+            <div class="inputs">
+              <div class="in uid" data-part="uid"><b>User ID</b>Embedding<span class="flow">→ 64</span></div>
+              <div class="in iid" data-part="iid"><b>Hotel ID</b>Embedding<span class="flow">→ 64</span></div>
+              <div class="in itx" data-part="itx"><b>Hotel reviews</b>MPNet / MiniLM<span class="flow">768 / 384 → 64</span></div>
+              <div class="in utx" data-part="utx"><b>User reviews</b>MPNet / MiniLM<span class="flow">768 / 384 → 64</span></div>
             </div>
+            <div class="arrow"></div>
+            <div class="zbar"><span class="uid" data-part="uid"></span><span class="iid" data-part="iid"></span><span class="itx" data-part="itx"></span><span class="utx" data-part="utx"></span></div>
+            <div class="zlabel"><span>Concatenated input <span class="kx" data-tex="\mathbf{z}_0"></span></span><b id="zdim">256</b></div>
+            <div class="arrow"></div>
+            <div class="mlp">
+              <div class="layer"><b>Hidden layer 1</b><span>256 units, ReLU, dropout 0.5</span></div>
+              <div class="layer"><b>Hidden layer 2</b><span>128 units, ReLU</span></div>
+              <div class="layer"><b>Hidden layer 3</b><span>64 units, ReLU</span></div>
+            </div>
+            <div class="arrow"></div>
+            <div class="heads"><span>Service</span><span>Cleanliness</span><span>Value</span><span>Sleep quality</span><span>Rooms</span><span>Location</span></div>
+            <div class="arrow"></div>
+            <div class="out" id="archOut">Aggregation → overall rating</div>
+          </div>
+
+          <div class="arch-text" aria-live="polite">
+            <h4 id="archName"></h4>
+            <p class="dims" id="archDims"></p>
+            <p id="archDesc"></p>
+            <div class="eqblock" id="archEq"></div>
+          </div>
         </div>
-    </section>
+      </div>
+    </div>
+  </section>
 
-    <!-- Footer -->
-    <footer class="bg-white border-t border-gray-200 py-8">
-        <div class="max-w-7xl mx-auto px-4 text-center text-sm text-gray-400">
-            <p>&copy; 2025 San Tana. National Institute of Technology, Tsuyama College.</p>
+  <!-- ======================= 4 EXPERIMENT ======================= -->
+  <section class="chapter" id="experiment" aria-labelledby="h-exp">
+    <div class="wrap">
+      <div class="ch-head"><span class="ch-num">4</span><h2 id="h-exp">Experiment</h2></div>
+      <div class="ch-body">
+        <div class="prose">
+          <p>Every deep model used the same settings and the same saved data split, so any difference in results comes from the input, not the training.</p>
         </div>
-    </footer>
+        <dl class="spec">
+          <dt>Data split</dt><dd>70% train, 10% validation, 20% test, with a fixed random seed</dd>
+          <dt>Embeddings</dt><dd>64 dimensions for user and hotel IDs and for projected text</dd>
+          <dt>MLP tower</dt><dd>256 → 128 → 64, ReLU, dropout 0.5</dd>
+          <dt>Optimizer</dt><dd>AdamW, learning rate 0.0005, weight decay 0.0001</dd>
+          <dt>Batch size</dt><dd>1,024</dd>
+          <dt>Stopping</dt><dd>Early stopping at the lowest validation RMSE</dd>
+          <dt>Framework</dt><dd>PyTorch</dd>
+          <dt>Baselines</dt><dd>Matrix Factorization (64-dim, dot product) and NCF-AG (same MLP, IDs only)</dd>
+        </dl>
 
-    <!-- JavaScript Logic -->
-    <script>
-        // --- State Management ---
-        let currentModel = 'mpnet'; // 'mpnet' or 'minilm'
-        let currentArch = 'baseline';
+        <h3>Training objective and metric</h3>
+        <div class="prose"><p>The models learn the overall rating and the six criteria at the same time. Results are reported as RMSE on the test set, in stars; lower is better.</p></div>
+        <div class="eqs">
+          <div class="eqrow"><span class="kx" data-tex="\mathcal{L} = \mathcal{L}_{overall} + \alpha \sum_{k=1}^{6} \mathcal{L}^{(k)}_{criteria}" data-display></span><small>(12) loss</small></div>
+          <div class="eqrow"><span class="kx" data-tex="\mathcal{L}_{overall} = \frac{1}{N}\sum \left(\hat{R}^{1}_{ui} - R^{1}_{ui}\right)^2" data-display></span><small>(13) MSE</small></div>
+          <div class="eqrow"><span class="kx" data-tex="\mathrm{RMSE} = \sqrt{\frac{1}{N}\sum_{i=1}^{N}\left(R_{ui} - \hat{R}_{ui}\right)^2}" data-display></span><small>(14) metric</small></div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-        // --- Data Store (Simulated based on uploaded files and common NCF patterns) ---
-        const thesisData = {
-            mpnet: {
-                learning: {
-                    labels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-                    baseline: [1.2, 1.1, 1.05, 1.02, 0.99, 0.97, 0.96, 0.95, 0.94, 0.93],
-                    hybrid:   [1.15, 1.05, 0.98, 0.94, 0.91, 0.89, 0.87, 0.86, 0.85, 0.84],
-                    full:     [1.10, 0.99, 0.92, 0.88, 0.85, 0.83, 0.81, 0.80, 0.79, 0.78]
-                },
-                comparison: {
-                    labels: ['Baseline (IDs)', 'Hybrid (Item Text)', 'Advanced (Full)'],
-                    rmse: [0.8910, 0.8245, 0.7842],
-                    mae:  [0.6820, 0.6350, 0.6010]
-                },
-                gain: "12.0%",
-                insight: "MPNet's larger dimension (768) captures subtle semantic nuances, leading to the best overall RMSE of 0.7842."
-            },
-            minilm: {
-                learning: {
-                    labels: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-                    baseline: [1.2, 1.1, 1.05, 1.02, 0.99, 0.97, 0.96, 0.95, 0.94, 0.93], // Baseline is same logic usually
-                    hybrid:   [1.18, 1.08, 1.01, 0.96, 0.93, 0.91, 0.89, 0.88, 0.87, 0.86],
-                    full:     [1.12, 1.02, 0.95, 0.90, 0.87, 0.85, 0.83, 0.82, 0.81, 0.80]
-                },
-                comparison: {
-                    labels: ['Baseline (IDs)', 'Hybrid (Item Text)', 'Advanced (Full)'],
-                    rmse: [0.8910, 0.8540, 0.8050],
-                    mae:  [0.6820, 0.6510, 0.6230]
-                },
-                gain: "9.6%",
-                insight: "MiniLM is 5x faster to train but slightly less accurate (RMSE 0.8050). It remains a strong candidate for real-time systems."
-            }
-        };
+  <!-- ======================= 5 RESULTS ======================= -->
+  <section class="chapter" id="results" aria-labelledby="h-res">
+    <div class="wrap">
+      <div class="ch-head"><span class="ch-num">5</span><h2 id="h-res">Results</h2></div>
+      <div class="ch-body">
+        <div class="prose">
+          <p class="lead">Every kind of review text helps, and the order is the same for both embedding models: hotel text a little, user text more, both together the most.</p>
+        </div>
 
-        // --- Chart Objects ---
-        let learningChart = null;
-        let comparisonChart = null;
+        <div class="panel" style="margin-top:24px">
+          <div class="panel-head">
+            <h4 id="rmseTitle">Test RMSE by architecture (lower is better)</h4>
+            <div class="tabs three" role="tablist" aria-label="Embedding model">
+              <button role="tab" aria-selected="true" data-emb="both">Both</button>
+              <button role="tab" aria-selected="false" data-emb="mpnet">MPNet<span class="long">&nbsp;(768)</span></button>
+              <button role="tab" aria-selected="false" data-emb="minilm">MiniLM<span class="long">&nbsp;(384)</span></button>
+            </div>
+          </div>
+          <div class="chart-box"><canvas id="rmseChart" role="img" aria-labelledby="rmseTitle"></canvas></div>
+          <div class="legend" id="rmseLegend"></div>
+          <p class="note" style="margin:10px 0 0">The axis starts at 0.80 to make the differences visible. Matrix Factorization (2.0657) is far off this scale and is shown in the table.</p>
+        </div>
 
-        // --- Initialization ---
-        document.addEventListener('DOMContentLoaded', () => {
-            initCharts();
-            updateDashboard('mpnet');
-        });
+        <div class="grid-2">
+          <div class="panel">
+            <table class="rt">
+              <caption>Table 2. Final test RMSE</caption>
+              <thead><tr><th scope="col">Model</th><th scope="col">MiniLM</th><th scope="col">MPNet</th></tr></thead>
+              <tbody>
+                <tr><td class="m"><span class="swatch" style="background:var(--c-mf)"></span>Matrix Factorization</td><td colspan="2" style="text-align:center">2.0657 <span class="na">(no text)</span></td></tr>
+                <tr><td class="m"><span class="swatch" style="background:var(--c-base)"></span>Baseline NCF-AG</td><td>0.8441</td><td>0.8545</td></tr>
+                <tr><td class="m"><span class="swatch" style="background:var(--c-item)"></span>Item-Text hybrid</td><td>0.8362</td><td>0.8402</td></tr>
+                <tr><td class="m"><span class="swatch" style="background:var(--c-user)"></span>User-Text hybrid</td><td>0.8303</td><td>0.8245</td></tr>
+                <tr class="best"><td class="m"><span class="swatch" style="background:var(--c-dual)"></span>Dual-Side (proposed)</td><td>0.8258</td><td>0.8163</td></tr>
+              </tbody>
+            </table>
+            <p class="note" style="margin:12px 0 0">Results from a single optimized training run with a fixed random seed.</p>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h4 id="gainTitle">Improvement over NCF-AG</h4></div>
+            <div class="chart-box" style="height:260px"><canvas id="gainChart" role="img" aria-labelledby="gainTitle"></canvas></div>
+            <p class="note" style="margin:10px 0 0">Relative RMSE reduction, (baseline − model) ÷ baseline, computed from Table 2 for each embedding model.</p>
+          </div>
+        </div>
 
-        // --- Chart Initialization Function ---
-        function initCharts() {
-            // 1. Learning Curve Chart
-            const ctxLearning = document.getElementById('learningCurveChart').getContext('2d');
-            learningChart = new Chart(ctxLearning, {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [
-                        { label: 'Baseline', borderColor: '#9CA3AF', borderDash: [5, 5], data: [], tension: 0.4 },
-                        { label: 'Hybrid (Item)', borderColor: '#F59E0B', data: [], tension: 0.4 },
-                        { label: 'Advanced (Full)', borderColor: '#10B981', borderWidth: 3, data: [], tension: 0.4 }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        legend: { position: 'bottom' },
-                        tooltip: {
-                            backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                            titleColor: '#1F2937',
-                            bodyColor: '#4B5563',
-                            borderColor: '#E5E7EB',
-                            borderWidth: 1
-                        }
-                    },
-                    scales: {
-                        y: { title: { display: true, text: 'Validation RMSE' } },
-                        x: { title: { display: true, text: 'Epochs' } }
-                    }
-                }
-            });
+        <ul class="findings">
+          <li style="--fc:var(--c-user)"><div><b>Who the user is matters more than what the hotel is</b><p>With MPNet, user review text alone cut RMSE by 3.51%, about twice the 1.67% from hotel review text. A user's past writing carries a "rating persona": what they care about (a station nearby, good food, a quiet view) and how strictly they rate.</p></div></li>
+          <li style="--fc:var(--c-dual)"><div><b>Fusing both sides works best</b><p>The Dual-Side model was the most accurate with both embedding models: 0.8163 with MPNet (−4.47%) and 0.8258 with MiniLM (−2.17%).</p></div></li>
+          <li style="--fc:var(--c-uid)"><div><b>A size and accuracy trade-off</b><p>MPNet (768 dimensions) gives the best accuracy. MiniLM (384) is close behind with half-size vectors, less memory and faster training. MPNet suits large booking platforms, and MiniLM suits real-time or mobile systems.</p></div></li>
+        </ul>
 
-            // 2. Comparison Bar Chart
-            const ctxComp = document.getElementById('comparisonChart').getContext('2d');
-            comparisonChart = new Chart(ctxComp, {
-                type: 'bar',
-                data: {
-                    labels: [],
-                    datasets: [
-                        {
-                            label: 'RMSE',
-                            data: [],
-                            backgroundColor: ['#E5E7EB', '#FCD34D', '#34D399'],
-                            borderColor: ['#9CA3AF', '#F59E0B', '#10B981'],
-                            borderWidth: 1
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return `RMSE: ${context.raw}`;
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: { beginAtZero: false, min: 0.7 }
-                    }
-                }
-            });
-        }
+        <h3>How the models trained</h3>
+        <div class="prose"><p>Validation RMSE fell fastest and lowest for the Dual-Side model. After about 12 epochs the error started to rise again (overfitting), so early stopping kept the best checkpoint.</p></div>
+        <div class="figpair">
+          <figure>
+            <div class="fig"><img src="assets/fig5-learning-minilm.png" width="710" height="468" loading="lazy" alt="Validation RMSE per epoch with MiniLM embeddings for the four NCF-AG models. The Dual-Side model reaches the lowest error, about 0.825 near epoch 11." /></div>
+            <figcaption><b>MiniLM (384-dim).</b> Validation RMSE per epoch.</figcaption>
+          </figure>
+          <figure>
+            <div class="fig"><img src="assets/fig5-learning-mpnet.png" width="665" height="468" loading="lazy" alt="Validation RMSE per epoch with MPNet embeddings. The Dual-Side model reaches the lowest error, about 0.816 near epochs 10 and 11, below User-Hybrid, Item-Hybrid and the NCF-AG baseline." /></div>
+            <figcaption><b>MPNet (768-dim).</b> Validation RMSE per epoch. Figure 5 in the thesis.</figcaption>
+          </figure>
+        </div>
 
-        // --- Update Logic ---
-        function updateDashboard(model) {
-            currentModel = model;
-            const data = thesisData[model];
+        <h3>Improvement across all six criteria</h3>
+        <div class="grid-2" style="margin-top:0">
+          <figure>
+            <div class="fig"><img src="assets/fig8-criteria-radar.jpg" width="961" height="436" loading="lazy" alt="Radar chart of RMSE for each criterion with MPNet. The Dual-Side model line is closest to the centre on all six criteria; the largest gaps from the baseline are on Value and Service." /></div>
+            <figcaption><b>Per-criterion RMSE with MPNet</b> (closer to the centre is better). Figure 8 in the thesis.</figcaption>
+          </figure>
+          <div class="prose">
+            <p>The Dual-Side model has the lowest error on every criterion, not only on the overall rating.</p>
+            <p>The biggest gains are on the most subjective criteria, <strong>Value</strong> and <strong>Service</strong>. IDs alone can't say why someone felt a stay was poor value; the text of their complaints and praise can.</p>
+          </div>
+        </div>
 
-            // 1. Update Buttons Styling
-            document.getElementById('sel-mpnet').className = model === 'mpnet' 
-                ? "px-4 py-2 rounded-md text-sm font-medium bg-white shadow-sm text-blue-600 transition-all"
-                : "px-4 py-2 rounded-md text-sm font-medium text-gray-500 hover:text-blue-600 transition-all";
-            
-            document.getElementById('sel-minilm').className = model === 'minilm'
-                ? "px-4 py-2 rounded-md text-sm font-medium bg-white shadow-sm text-violet-600 transition-all"
-                : "px-4 py-2 rounded-md text-sm font-medium text-gray-500 hover:text-violet-600 transition-all";
+        <h3>Why deep models: the Matrix Factorization baseline</h3>
+        <div class="grid-2" style="margin-top:0">
+          <figure>
+            <div class="fig"><img src="assets/fig4-mf-validation.png" width="756" height="488" loading="lazy" alt="Validation RMSE of Matrix Factorization over about 50 epochs: it falls slowly from about 5 and levels off just above 2 after around 30 epochs." /></div>
+            <figcaption><b>Matrix Factorization.</b> Validation RMSE per epoch. Figure 4 in the thesis.</figcaption>
+          </figure>
+          <div class="prose">
+            <p>The linear MF baseline converged slowly, needing more than 30 epochs, and settled above 2.0 RMSE (2.0657 on the test set).</p>
+            <p>Every NCF-AG model stayed below 0.86. The non-linear, multi-criteria backbone is what makes the text features worth adding.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-            // 2. Update Charts
-            // Learning Curve
-            learningChart.data.labels = data.learning.labels;
-            learningChart.data.datasets[0].data = data.learning.baseline;
-            learningChart.data.datasets[1].data = data.learning.hybrid;
-            learningChart.data.datasets[2].data = data.learning.full;
-            learningChart.update();
+  <!-- ======================= 6 CONCLUSION ======================= -->
+  <section class="chapter" id="conclusion" aria-labelledby="h-con">
+    <div class="wrap">
+      <div class="ch-head"><span class="ch-num">6</span><h2 id="h-con">Conclusion</h2></div>
+      <div class="ch-body">
+        <div class="prose">
+          <p class="lead">Adding semantic profiles of both users and hotels to NCF-AG lowered test RMSE on every model, reaching 0.8163 with the Dual-Side model and MPNet embeddings.</p>
+          <p>The main finding is the "user persona": a user's aggregated review history predicts their future ratings better than descriptions of the hotel do. Deep models can learn a user's own rating standards, critical or generous, directly from how they write. That points to a new direction for personalized recommendation.</p>
+        </div>
+        <h3>Future work</h3>
+        <ul class="future">
+          <li><b>Attention over reviews</b><span>Learn which reviews or sentences matter most for each prediction, instead of aggregating all text equally.</span></li>
+          <li><b>Profiles that change over time</b><span>Update user embeddings as new reviews arrive, to follow how a rating persona changes over months or years.</span></li>
+          <li><b>Distillation for mobile</b><span>Transfer MPNet's accuracy into the lighter MiniLM architecture for on-device recommendation.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
 
-            // Comparison Chart
-            comparisonChart.data.labels = data.comparison.labels;
-            comparisonChart.data.datasets[0].data = data.comparison.rmse;
-            comparisonChart.update();
+  <!-- ======================= REFERENCES ======================= -->
+  <section class="chapter" id="references" aria-labelledby="h-ref">
+    <div class="wrap">
+      <div class="ch-head"><span class="ch-num" aria-hidden="true"></span><h2 id="h-ref">References</h2></div>
+      <div class="ch-body">
+        <ol class="refs">
+          <li>He, X., Liao, L., Zhang, H., et al.: Neural Collaborative Filtering. <a href="https://arxiv.org/abs/1708.05031">arXiv:1708.05031</a> (2017).</li>
+          <li>Morise, H., Atarashi, K., Oyama, S., et al.: Neural collaborative filtering with multicriteria evaluation data. Applied Soft Computing, 119, 108548 (2022).</li>
+          <li>Diego999: HotelRec, a large-scale (~50M) hotel reviews dataset. <a href="https://github.com/Diego999/HotelRec">github.com/Diego999/HotelRec</a> (accessed 2025-07-22).</li>
+          <li>Reimers, N., Gurevych, I.: Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks. Proc. EMNLP 2019.</li>
+          <li>Song, K., Tan, X., Qin, T., Lu, J., Liu, T.-Y.: MPNet: Masked and Permuted Pre-training for Language Understanding. NeurIPS 33, 16857–16867 (2020).</li>
+          <li>Koren, Y., Bell, R., Volinsky, C.: Matrix factorization techniques for recommender systems. Computer, 42(8), 30–37 (2009).</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+</main>
 
-            // 3. Update Text & Stats
-            document.getElementById('best-rmse').innerText = Math.min(...data.comparison.rmse).toFixed(4);
-            document.getElementById('percent-gain').innerText = data.gain;
-            document.getElementById('insight-text').innerHTML = data.insight;
+<footer>
+  <div class="wrap">
+    <span>© 2026 San Tana, National Institute of Technology, Tsuyama College</span>
+    <a href="https://github.com/Tana-jouhou72/ncf-thesis-viz">Source on GitHub</a>
+  </div>
+</footer>
 
-            // 4. Update Master Table
-            const tbody = document.getElementById('master-table-body');
-            tbody.innerHTML = '';
-            data.comparison.labels.forEach((label, index) => {
-                const tr = document.createElement('tr');
-                // Highlight the best row
-                const isBest = index === 2; // Full model is always last and best here
-                if(isBest) tr.className = "bg-emerald-50";
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js" defer></script>
+<script>
+'use strict';
+/* All numbers come from the thesis (Table 2). */
+const MODELS = [
+  { key: 'base', name: 'Baseline NCF-AG', short: 'Baseline', color: '--c-base' },
+  { key: 'item', name: 'Item-Text hybrid', short: 'Item-Text', color: '--c-item' },
+  { key: 'user', name: 'User-Text hybrid', short: 'User-Text', color: '--c-user' },
+  { key: 'dual', name: 'Dual-Side (proposed)', short: 'Dual-Side', color: '--c-dual' },
+];
+const RMSE = {
+  minilm: { base: 0.8441, item: 0.8362, user: 0.8303, dual: 0.8258 },
+  mpnet:  { base: 0.8545, item: 0.8402, user: 0.8245, dual: 0.8163 },
+};
+const gain = (emb, k) => ((RMSE[emb].base - RMSE[emb][k]) / RMSE[emb].base) * 100;
 
-                tr.innerHTML = `
-                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium ${isBest ? 'text-emerald-700' : 'text-gray-900'}">${label}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-right ${isBest ? 'text-emerald-700 font-bold' : 'text-gray-500'}">${data.comparison.rmse[index].toFixed(4)}</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-right ${isBest ? 'text-emerald-700' : 'text-gray-500'}">${data.comparison.mae[index].toFixed(4)}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
+const ARCH = {
+  base: {
+    parts: ['uid', 'iid'], dim: 128, color: '--c-base',
+    name: 'Baseline NCF-AG', dims: 'Input: 64 + 64 = 128 dimensions (IDs only)',
+    desc: 'The state-of-the-art multi-criteria model, re-implemented as the baseline. It sees only who rated and what was rated. Any gain in the other three models comes from the review text.',
+    eq: '\\mathbf{z}_0 = \\mathbf{p}_u \\oplus \\mathbf{q}_i \\in \\mathbb{R}^{128}',
+  },
+  item: {
+    parts: ['uid', 'iid', 'itx'], dim: 192, color: '--c-item',
+    name: 'Item-Text hybrid', dims: 'Input: 64 + 64 + 64 = 192 dimensions',
+    desc: 'Adds the hotel\'s semantic profile: all reviews the hotel received, encoded and projected to 64 numbers. The model can "read" what guests say about cleanliness or location even when the ID signal is weak.',
+    eq: "\\mathbf{z}_0 = \\mathbf{p}_u \\oplus \\mathbf{q}_i \\oplus \\mathbf{t}'_i,\\quad \\mathbf{t}' = \\mathrm{ReLU}(W_{proj}\\,\\mathbf{e} + \\mathbf{b}_{proj})",
+  },
+  user: {
+    parts: ['uid', 'iid', 'utx'], dim: 192, color: '--c-user',
+    name: 'User-Text hybrid', dims: 'Input: 64 + 64 + 64 = 192 dimensions',
+    desc: 'Adds the user\'s semantic profile: everything the user has written. It tests whether writing style and history reveal a "rating persona", such as someone who always complains about price or is generous with stars.',
+    eq: "\\mathbf{z}_0 = \\mathbf{p}_u \\oplus \\mathbf{q}_i \\oplus \\mathbf{t}'_u,\\quad W_{proj} \\in \\mathbb{R}^{64\\times768}",
+  },
+  dual: {
+    parts: ['uid', 'iid', 'itx', 'utx'], dim: 256, color: '--c-dual',
+    name: 'Dual-Side fusion (proposed)', dims: 'Input: 64 + 64 + 64 + 64 = 256 dimensions',
+    desc: 'Combines everything: collaborative IDs plus the semantic profiles of both the hotel and the user. The model can match what this user cares about with what this hotel offers. It achieved the lowest error with both embedding models.',
+    eq: "\\mathbf{z}_0 = \\mathbf{p}_u \\oplus \\mathbf{q}_i \\oplus \\mathbf{t}'_i \\oplus \\mathbf{t}'_u \\in \\mathbb{R}^{256}",
+  },
+};
 
-        // --- Architecture Diagram Logic ---
-        function setArch(type) {
-            const btnBaseline = document.getElementById('btn-baseline');
-            const btnHybrid = document.getElementById('btn-hybrid');
-            const hybridInputs = document.getElementById('hybrid-inputs');
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 
-            if (type === 'baseline') {
-                btnBaseline.className = "px-4 py-2 rounded-md text-sm font-medium bg-white shadow-sm text-gray-900 transition-all";
-                btnHybrid.className = "px-4 py-2 rounded-md text-sm font-medium text-gray-500 hover:text-gray-900 transition-all";
-                
-                // Hide hybrid parts
-                hybridInputs.classList.add('opacity-0');
-                setTimeout(() => hybridInputs.classList.add('hidden'), 500);
-            } else {
-                btnHybrid.className = "px-4 py-2 rounded-md text-sm font-medium bg-emerald-50 text-emerald-700 shadow-sm border border-emerald-200 transition-all";
-                btnBaseline.className = "px-4 py-2 rounded-md text-sm font-medium text-gray-500 hover:text-gray-900 transition-all";
-                
-                // Show hybrid parts
-                hybridInputs.classList.remove('hidden');
-                // Small delay to allow display:flex to apply before opacity transition
-                setTimeout(() => hybridInputs.classList.remove('opacity-0'), 20);
-            }
-        }
+/* ---------- maths ---------- */
+function renderTex(root = document) {
+  if (!window.katex) return;
+  $$('[data-tex]', root).forEach((el) => {
+    try { katex.render(el.dataset.tex, el, { displayMode: el.hasAttribute('data-display'), throwOnError: false }); }
+    catch { el.textContent = el.dataset.tex; }
+  });
+}
 
-        // --- Utility ---
-        function scrollToSection(id) {
-            document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
-            
-            // Update active nav state
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active', 'text-emerald-600'));
-            event.target.classList.add('active');
-        }
+/* ---------- architecture explorer ---------- */
+function showArch(key, focus = false) {
+  const a = ARCH[key];
+  $$('[data-arch]').forEach((b) => {
+    const on = b.dataset.arch === key;
+    b.setAttribute('aria-selected', on);
+    b.tabIndex = on ? 0 : -1;
+    if (on && focus) b.focus();
+  });
+  $('#arch-panel').setAttribute('aria-labelledby', 'tab-' + key);
+  $$('.inputs .in').forEach((el) => el.classList.toggle('off', !a.parts.includes(el.dataset.part)));
+  $$('.zbar span').forEach((el) => el.classList.toggle('gone', !a.parts.includes(el.dataset.part)));
+  $('#zdim').textContent = a.dim;
+  $('#archOut').style.background = `var(${a.color})`;
+  $('#archName').innerHTML = `<span class="swatch" style="background:var(${a.color})"></span>${a.name}`;
+  $('#archDims').textContent = a.dims;
+  const r = RMSE.mpnet[key], m = RMSE.minilm[key];
+  $('#archDesc').innerHTML = `${a.desc} <br><span class="sans" style="font-size:.9rem;color:var(--ink-2)">Test RMSE: <b style="color:var(--ink)">${r.toFixed(4)}</b> (MPNet), <b style="color:var(--ink)">${m.toFixed(4)}</b> (MiniLM)</span>`;
+  const eq = $('#archEq');
+  eq.dataset.tex = a.eq;
+  eq.setAttribute('data-display', '');
+  if (window.katex) renderTex(eq.parentNode); else eq.textContent = a.eq;
+}
+function tabKeys(list, onPick) {
+  list.addEventListener('keydown', (e) => {
+    const tabs = $$('[role="tab"]', list);
+    const i = tabs.indexOf(document.activeElement);
+    if (i < 0) return;
+    let j = null;
+    if (e.key === 'ArrowRight') j = (i + 1) % tabs.length;
+    if (e.key === 'ArrowLeft') j = (i - 1 + tabs.length) % tabs.length;
+    if (e.key === 'Home') j = 0;
+    if (e.key === 'End') j = tabs.length - 1;
+    if (j !== null) { e.preventDefault(); onPick(tabs[j]); }
+  });
+}
 
-    </script>
-    
-    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+/* ---------- charts ---------- */
+let rmseChart = null, gainChart = null, embView = 'both';
+function tint(hex, a) { // hex colour → rgba with alpha
+  const h = hex.replace('#', '');
+  const n = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+function chartTheme() {
+  return { ink: css('--ink'), ink2: css('--ink-2'), line: css('--line-2'), font: "'IBM Plex Sans', system-ui, sans-serif" };
+}
+const valueLabels = {
+  id: 'valueLabels',
+  afterDatasetsDraw(chart, _, opts) {
+    const { ctx } = chart;
+    ctx.save();
+    ctx.font = `500 11px ${opts.font}`;
+    ctx.fillStyle = opts.color;
+    ctx.textAlign = 'center';
+    chart.data.datasets.forEach((ds, di) => {
+      const meta = chart.getDatasetMeta(di);
+      if (meta.hidden || (opts.minWidth && chart.width < opts.minWidth)) return;
+      meta.data.forEach((bar, i) => {
+        const v = ds.data[i];
+        if (v == null) return;
+        const text = opts.format(v);
+        if (opts.horizontal) { ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(text, bar.x + 6, bar.y); }
+        else { ctx.textBaseline = 'bottom'; ctx.fillText(text, bar.x, bar.y - 4); }
+      });
+    });
+    ctx.restore();
+  },
+};
+function rmseDatasets() {
+  const embs = embView === 'both' ? ['minilm', 'mpnet'] : [embView];
+  return embs.map((emb) => ({
+    label: emb === 'mpnet' ? 'MPNet (768-dim)' : 'MiniLM (384-dim)',
+    data: MODELS.map((m) => RMSE[emb][m.key]),
+    backgroundColor: MODELS.map((m) => (emb === 'minilm' && embView === 'both' ? tint(css(m.color), .42) : css(m.color))),
+    borderColor: MODELS.map((m) => css(m.color)),
+    borderWidth: emb === 'minilm' && embView === 'both' ? 1.5 : 0,
+    borderRadius: 3,
+    maxBarThickness: 64,
+  }));
+}
+function drawLegend() {
+  const box = $('#rmseLegend');
+  const modelKeys = MODELS.map((m) => `<span><i class="swatch" style="background:var(${m.color})"></i>${m.short}</span>`).join('');
+  const emb = embView === 'both'
+    ? '<span><i class="swatch tint" style="background:var(--ink-2)"></i>Light: MiniLM (384)</span><span><i class="swatch" style="background:var(--ink-2)"></i>Solid: MPNet (768)</span>'
+    : `<span>Showing ${embView === 'mpnet' ? 'MPNet (768-dim)' : 'MiniLM (384-dim)'} only</span>`;
+  box.innerHTML = modelKeys + emb;
+}
+function buildCharts() {
+  if (!window.Chart) {
+    $$('.chart-box').forEach((b) => (b.innerHTML = '<p class="chart-fallback">The chart could not load (are you offline?). The same numbers are in Table 2.</p>'));
+    return;
+  }
+  const t = chartTheme();
+  Chart.defaults.font.family = t.font;
+  Chart.defaults.color = t.ink2;
+  const tooltip = { backgroundColor: css('--surface'), titleColor: t.ink, bodyColor: t.ink2, borderColor: css('--line'), borderWidth: 1, padding: 10, titleFont: { weight: '600' } };
+
+  if (rmseChart) rmseChart.destroy();
+  rmseChart = new Chart($('#rmseChart'), {
+    type: 'bar',
+    data: { labels: MODELS.map((m) => m.short), datasets: rmseDatasets() },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 450 },
+      layout: { padding: { top: 18 } },
+      scales: {
+        y: { min: 0.8, max: 0.86, ticks: { stepSize: 0.01, callback: (v) => v.toFixed(2) }, grid: { color: t.line }, border: { display: false }, title: { display: true, text: 'Test RMSE (stars)' } },
+        x: { grid: { display: false }, border: { color: css('--line') }, ticks: { color: t.ink, maxRotation: 0, autoSkip: false, font: (c) => ({ weight: '500', size: c.chart.width < 420 ? 11 : 12 }) } },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { ...tooltip, callbacks: { label: (c) => `${c.dataset.label}: ${c.raw.toFixed(4)}` } },
+        valueLabels: { font: t.font, color: t.ink2, format: (v) => v.toFixed(4), get minWidth() { return embView === 'both' ? 520 : 0; } },
+      },
+    },
+    plugins: [valueLabels],
+  });
+  drawLegend();
+
+  if (gainChart) gainChart.destroy();
+  const keys = MODELS.slice(1);
+  gainChart = new Chart($('#gainChart'), {
+    type: 'bar',
+    data: {
+      labels: keys.map((m) => m.short),
+      datasets: ['mpnet', 'minilm'].map((emb) => ({
+        label: emb === 'mpnet' ? 'MPNet (768)' : 'MiniLM (384)',
+        data: keys.map((m) => +gain(emb, m.key).toFixed(2)),
+        backgroundColor: keys.map((m) => (emb === 'minilm' ? tint(css(m.color), .42) : css(m.color))),
+        borderColor: keys.map((m) => css(m.color)),
+        borderWidth: emb === 'minilm' ? 1.5 : 0,
+        borderRadius: 3,
+        maxBarThickness: 22,
+      })),
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      animation: { duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 450 },
+      layout: { padding: { right: 44 } },
+      scales: {
+        x: { min: 0, max: 5, ticks: { callback: (v) => v + '%' }, grid: { color: t.line }, border: { display: false } },
+        y: { grid: { display: false }, ticks: { color: t.ink, font: { weight: '500' } }, border: { color: css('--line') } },
+      },
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, boxHeight: 12, generateLabels: () => [
+          { text: 'MPNet (solid)', fillStyle: t.ink2, strokeStyle: t.ink2, lineWidth: 0, fontColor: t.ink2 },
+          { text: 'MiniLM (light)', fillStyle: tint(t.ink2.startsWith('#') ? t.ink2 : '#4A5566', .35), strokeStyle: t.ink2, lineWidth: 1, fontColor: t.ink2 },
+        ] } },
+        tooltip: { ...tooltip, callbacks: { label: (c) => `${c.dataset.label}: −${c.raw.toFixed(2)}% RMSE` } },
+        valueLabels: { font: t.font, color: t.ink2, horizontal: true, format: (v) => v.toFixed(2) + '%' },
+      },
+    },
+    plugins: [valueLabels],
+  });
+}
+function setEmb(btn) {
+  embView = btn.dataset.emb;
+  $$('[data-emb]').forEach((b) => { const on = b === btn; b.setAttribute('aria-selected', on); b.tabIndex = on ? 0 : -1; });
+  btn.focus();
+  if (!rmseChart) return;
+  rmseChart.data.datasets = rmseDatasets();
+  rmseChart.update();
+  drawLegend();
+}
+
+/* ---------- section highlight in the top bar ---------- */
+function watchSections() {
+  const links = new Map($$('.nav a').map((a) => [a.getAttribute('href').slice(1), a]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((en) => {
+      if (!en.isIntersecting) return;
+      links.forEach((a) => a.classList.remove('on'));
+      const a = links.get(en.target.id);
+      if (a) { a.classList.add('on'); a.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+    });
+  }, { rootMargin: '-45% 0px -50% 0px' });
+  links.forEach((_, id) => { const s = document.getElementById(id); if (s) io.observe(s); });
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  renderTex();
+  $$('[data-arch]').forEach((b) => (b.onclick = () => showArch(b.dataset.arch)));
+  tabKeys($('[data-arch]').parentNode, (b) => showArch(b.dataset.arch, true));
+  $$('[data-emb]').forEach((b) => { b.onclick = () => setEmb(b); b.tabIndex = b.getAttribute('aria-selected') === 'true' ? 0 : -1; });
+  tabKeys($('[data-emb]').parentNode, setEmb);
+  showArch('dual');
+  buildCharts();
+  watchSections();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', buildCharts);
+});
+</script>
 </body>
 </html>
