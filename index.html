@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Dual-Side Semantic NCF-AG | San Tana</title>
 <meta name="description" content="Graduation research thesis (NIT Tsuyama College, 2026): enhancing Neural Collaborative Filtering by Aggregation with dual-side semantic review embeddings. Test RMSE 0.8163 on 3 million TripAdvisor hotel ratings." />
-<meta name="theme-color" content="#0A1433" />
+<meta name="theme-color" content="#050505" />
 <meta property="og:title" content="Enhancing Neural Collaborative Filtering by Aggregation with Dual-Side Semantic Review Embeddings" />
 <meta property="og:description" content="Fusing user and hotel review embeddings (MPNet / MiniLM) into NCF-AG. Best test RMSE 0.8163, 4.47% lower than the NCF-AG baseline." />
 <script>
@@ -32,8 +32,8 @@
     --ink-3: #6A7689;
     --line: #E1E6EE;
     --line-2: #ECF0F5;
-    --navy-1: #0A1433;
-    --navy-2: #15275F;
+    --navy-1: #0A0A0A;   /* hero + footer: black and white */
+    --navy-2: #050505;
     /* the four parts of the input vector and the four models (colours from the thesis figures) */
     --c-uid: #4F6380;
     --c-iid: #8E9CB0;
@@ -101,60 +101,70 @@
   .lang button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
   .top.on-hero { background: transparent; border-bottom-color: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; }
   .top.on-hero .brand, .top.on-hero .nav a.on, .top.on-hero .nav a:hover { color: #fff; }
-  .top.on-hero .nav a { color: rgba(232, 237, 247, .78); }
+  .top.on-hero .brand-mark i { filter: grayscale(1) brightness(1.6); }
+  .top.on-hero.scrolled { background: rgba(5, 5, 5, .88); border-bottom-color: rgba(255, 255, 255, .08); backdrop-filter: saturate(1.2) blur(14px); -webkit-backdrop-filter: saturate(1.2) blur(14px); }
+  .top.on-hero .nav a { color: rgba(255, 255, 255, .66); }
   .top.on-hero .nav a.on, .top.on-hero .nav a:hover { background: rgba(255, 255, 255, .1); }
   .top.on-hero .lang { border-color: rgba(255, 255, 255, .2); background: rgba(255, 255, 255, .06); }
-  .top.on-hero .lang button { color: rgba(232, 237, 247, .8); }
-  .top.on-hero .lang button[aria-pressed="true"] { background: #fff; color: var(--navy-1); }
+  .top.on-hero .lang button { color: rgba(255, 255, 255, .7); }
+  .top.on-hero .lang button[aria-pressed="true"] { background: #fff; color: #0A0A0A; }
   @media (max-width: 760px) { .brand-text { display: none; } .nav a { padding: 7px 9px; font-size: .84rem; } .nav .n { display: none; } }
 
   /* ---------- hero ---------- */
-  .hero { position: relative; margin-top: calc(-1 * var(--top-h)); padding: calc(var(--top-h) + 76px) 0 64px; color: #E6EBF5; overflow: hidden; isolation: isolate;
+  .hero { position: relative; margin-top: calc(-1 * var(--top-h)); padding: calc(var(--top-h) + 76px) 0 64px; color: #E8E8E8; overflow: hidden; isolation: isolate;
     background:
-      radial-gradient(900px 480px at 88% -8%, rgba(92, 104, 255, .42), transparent 62%),
-      radial-gradient(700px 420px at -6% 105%, rgba(28, 152, 131, .28), transparent 60%),
-      linear-gradient(165deg, var(--navy-1) 0%, var(--navy-2) 58%, #0F1D4A 100%); }
-  .hero::before { content: ""; position: absolute; inset: 0; z-index: -1; background-image: radial-gradient(rgba(255, 255, 255, .09) 1px, transparent 1.2px); background-size: 24px 24px; -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.6) 55%, transparent 100%); mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.6) 55%, transparent 100%); }
-  .pill { display: inline-flex; align-items: center; gap: 8px; font-family: var(--sans); font-size: .85rem; color: #D7DEEE; padding: 6px 14px 6px 8px; border-radius: 99px; border: 1px solid rgba(255, 255, 255, .16); background: rgba(255, 255, 255, .05); margin: 0 0 24px; }
-  .pill i { width: 8px; height: 8px; border-radius: 50%; background: #5EE1C8; box-shadow: 0 0 0 4px rgba(94, 225, 200, .18); margin-left: 4px; }
+      radial-gradient(1100px 560px at 78% -12%, rgba(255, 255, 255, .13), transparent 60%),
+      radial-gradient(600px 380px at 8% 108%, rgba(255, 255, 255, .06), transparent 62%),
+      #050505; }
+  .hero::before { content: ""; position: absolute; inset: 0; z-index: -1;
+    background-image: linear-gradient(rgba(255, 255, 255, .055) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .055) 1px, transparent 1px);
+    background-size: 56px 56px; background-position: -1px -1px;
+    -webkit-mask-image: radial-gradient(120% 90% at 70% 0%, #000 0%, rgba(0,0,0,.55) 45%, transparent 85%); mask-image: radial-gradient(120% 90% at 70% 0%, #000 0%, rgba(0,0,0,.55) 45%, transparent 85%); }
+  .hero::after { content: ""; position: absolute; inset: 0; z-index: -1; opacity: .07; pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .9 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"); }
+  .pill { display: inline-flex; align-items: center; gap: 8px; font-family: var(--sans); font-size: .85rem; color: #D4D4D4; padding: 6px 14px 6px 8px; border-radius: 99px; border: 1px solid rgba(255, 255, 255, .16); background: rgba(255, 255, 255, .04); margin: 0 0 24px; }
+  .pill i { width: 8px; height: 8px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 4px rgba(255, 255, 255, .14), 0 0 12px rgba(255, 255, 255, .6); margin-left: 4px; }
   html[lang="ja"] .pill { font-family: var(--ja); }
-  .hero h1 { color: #fff; font-size: clamp(1.95rem, 1.15rem + 2.7vw, 3.2rem); font-weight: 600; letter-spacing: -0.02em; margin: 0 0 14px; max-width: 24ch; text-wrap: balance; }
+  .hero h1 { color: #fff; background: linear-gradient(180deg, #FFFFFF 30%, #9A9A9A 120%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-size: clamp(1.95rem, 1.15rem + 2.7vw, 3.2rem); font-weight: 600; letter-spacing: -0.02em; margin: 0 0 14px; max-width: 24ch; text-wrap: balance; }
   html[lang="ja"] .hero h1 { letter-spacing: 0; font-size: clamp(1.6rem, 1rem + 2.2vw, 2.6rem); max-width: 28ch; line-height: 1.4; }
-  .orig { font-family: var(--sans); font-size: .95rem; color: rgba(214, 222, 238, .7); margin: 0 0 20px; max-width: 70ch; }
-  .byline { font-family: var(--sans); font-size: 1rem; color: rgba(222, 229, 242, .82); margin: 0 0 30px; line-height: 1.65; }
+  .orig { font-family: var(--sans); font-size: .95rem; color: rgba(255, 255, 255, .55); margin: 0 0 20px; max-width: 70ch; }
+  .byline { font-family: var(--sans); font-size: 1rem; color: rgba(255, 255, 255, .7); margin: 0 0 30px; line-height: 1.65; }
   html[lang="ja"] .byline { font-family: var(--ja); }
   .byline b { color: #fff; font-weight: 600; }
   .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 52px; }
   .btn { font-family: var(--sans); font-size: .95rem; font-weight: 600; text-decoration: none; padding: 11px 18px; border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; transition: transform .15s, background .2s, border-color .2s; }
   html[lang="ja"] .btn { font-family: var(--ja); }
   .btn:active { transform: translateY(1px); }
-  .btn.primary { background: #fff; color: var(--navy-1); box-shadow: 0 8px 24px -10px rgba(0, 0, 0, .6); }
-  .btn.primary:hover { background: #EEF1FF; }
+  .btn.primary { background: #fff; color: #0A0A0A; box-shadow: 0 0 0 1px rgba(255,255,255,.2), 0 10px 30px -10px rgba(255, 255, 255, .35); }
+  .btn.primary:hover { background: #E6E6E6; }
   .btn.ghost { color: #fff; border: 1px solid rgba(255, 255, 255, .28); background: rgba(255, 255, 255, .04); }
   .btn.ghost:hover { border-color: rgba(255, 255, 255, .5); background: rgba(255, 255, 255, .08); }
   .btn svg { width: 16px; height: 16px; }
 
   /* the input vector z0 — the page's signature */
   .vec { max-width: 900px; }
-  .vec-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; height: 66px; padding: 4px; border-radius: 14px; background: rgba(255, 255, 255, .05); border: 1px solid rgba(255, 255, 255, .1); }
+  .vec-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; height: 66px; padding: 4px; border-radius: 14px; background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .12); }
   .seg { position: relative; border-radius: 9px; display: flex; align-items: center; padding: 0 14px; color: #fff; font-family: var(--sans); font-weight: 600; font-size: 1.05rem; overflow: hidden; transform-origin: left center; }
   .seg .kx { color: #fff; }
-  .seg.uid { background: linear-gradient(180deg, #6177A0, #4F6380); } .seg.iid { background: linear-gradient(180deg, #A2B0C4, #8696AC); }
-  .seg.itx { background: linear-gradient(180deg, #2BB39C, #1C9883); box-shadow: 0 8px 26px -8px rgba(43, 179, 156, .7); }
-  .seg.utx { background: linear-gradient(180deg, #E8A93A, #D4931A); box-shadow: 0 8px 26px -8px rgba(232, 169, 58, .7); }
-  .seg::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(100% / 16 - 1px), rgba(255, 255, 255, .16) calc(100% / 16 - 1px) calc(100% / 16)); }
-  .vec-labels { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 10px; padding: 0 4px; font-family: var(--sans); font-size: .84rem; color: rgba(214, 222, 238, .72); line-height: 1.4; }
+  .seg.uid { background: linear-gradient(180deg, #262626, #1A1A1A); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14); }
+  .seg.iid { background: linear-gradient(180deg, #3A3A3A, #2A2A2A); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16); }
+  .seg.itx { background: linear-gradient(180deg, #F2F2F2, #CFCFCF); box-shadow: 0 0 28px -6px rgba(255, 255, 255, .45); }
+  .seg.utx { background: linear-gradient(180deg, #FFFFFF, #E2E2E2); box-shadow: 0 0 34px -4px rgba(255, 255, 255, .6); }
+  .seg.itx, .seg.utx, .seg.itx .kx, .seg.utx .kx { color: #0A0A0A; }
+  .seg::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(100% / 16 - 1px), rgba(255, 255, 255, .07) calc(100% / 16 - 1px) calc(100% / 16)); }
+  .seg.itx::after, .seg.utx::after { background: repeating-linear-gradient(90deg, transparent 0 calc(100% / 16 - 1px), rgba(0, 0, 0, .08) calc(100% / 16 - 1px) calc(100% / 16)); }
+  .vec-labels { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 10px; padding: 0 4px; font-family: var(--sans); font-size: .84rem; color: rgba(255, 255, 255, .55); line-height: 1.4; }
   html[lang="ja"] .vec-labels, html[lang="ja"] .vec-caption { font-family: var(--ja); }
   .vec-labels b { display: block; color: #fff; font-weight: 500; }
-  .vec-caption { font-family: var(--sans); font-size: .9rem; color: rgba(214, 222, 238, .62); margin: 14px 0 0; padding: 0 4px; }
+  .vec-caption { font-family: var(--sans); font-size: .9rem; color: rgba(255, 255, 255, .5); margin: 14px 0 0; padding: 0 4px; }
   .hero .seg { animation: grow .8s cubic-bezier(.2, .7, .2, 1) both; }
   .hero .seg:nth-child(2) { animation-delay: .1s; } .hero .seg:nth-child(3) { animation-delay: .2s; } .hero .seg:nth-child(4) { animation-delay: .3s; }
   @keyframes grow { from { transform: scaleX(0); opacity: 0; } to { transform: scaleX(1); opacity: 1; } }
 
   .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 44px; }
-  .kpi { border-radius: 14px; border: 1px solid rgba(255, 255, 255, .12); background: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .03)); padding: 18px 18px 16px; }
+  .kpi { border-radius: 14px; border: 1px solid rgba(255, 255, 255, .1); background: linear-gradient(180deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, .02)); padding: 18px 18px 16px; backdrop-filter: blur(4px); }
   .kpi strong { display: block; font-family: var(--sans); font-size: 1.85rem; font-weight: 600; color: #fff; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.15; margin-bottom: 6px; }
-  .kpi span { font-family: var(--sans); font-size: .87rem; line-height: 1.45; color: rgba(214, 222, 238, .78); display: block; }
+  .kpi span { font-family: var(--sans); font-size: .87rem; line-height: 1.45; color: rgba(255, 255, 255, .6); display: block; }
   html[lang="ja"] .kpi span { font-family: var(--ja); }
   @media (max-width: 900px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 560px) {
@@ -354,7 +364,7 @@
   .refs li::before { counter-increment: ref; content: "[" counter(ref) "]"; position: absolute; left: 0; font-family: var(--sans); color: var(--ink-3); font-size: .88rem; }
   .refs a { word-break: break-word; }
 
-  footer { margin-top: 88px; background: linear-gradient(165deg, var(--navy-1), var(--navy-2)); color: rgba(214, 222, 238, .75); padding: 40px 0 48px; font-family: var(--sans); font-size: .9rem; }
+  footer { margin-top: 88px; background: #050505; border-top: 1px solid rgba(255, 255, 255, .08); color: rgba(255, 255, 255, .6); padding: 40px 0 48px; font-family: var(--sans); font-size: .9rem; }
   html[lang="ja"] footer { font-family: var(--ja); }
   footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px; }
   footer .brand { color: #fff; }
@@ -777,7 +787,7 @@
 
 <footer>
   <div class="wrap">
-    <span class="brand"><span class="brand-mark" aria-hidden="true"><i style="background:#6177A0"></i><i style="background:#A2B0C4"></i><i style="background:#2BB39C"></i><i style="background:#E8A93A"></i></span>© 2026 San Tana</span>
+    <span class="brand"><span class="brand-mark" aria-hidden="true"><i style="background:#3A3A3A"></i><i style="background:#5A5A5A"></i><i style="background:#D9D9D9"></i><i style="background:#FFFFFF"></i></span>© 2026 San Tana</span>
     <span><span data-l="en">National Institute of Technology, Tsuyama College</span><span data-l="ja">津山工業高等専門学校</span></span>
     <a class="gh" href="https://github.com/Tana-jouhou72/ncf-thesis-viz"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span data-l="en">Source on GitHub</span><span data-l="ja">GitHub のソース</span></a>
   </div>
@@ -1050,6 +1060,7 @@ function watchScroll() {
     ticking = false;
     const y = window.scrollY;
     bar.classList.toggle('on-hero', y < hero.offsetHeight - bar.offsetHeight - 8);
+    bar.classList.toggle('scrolled', y > 8);
     // highlight the section that is under the upper part of the screen
     const probe = y + innerHeight * 0.3;
     let idx = -1;
